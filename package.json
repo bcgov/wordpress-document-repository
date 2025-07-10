@@ -1,0 +1,48 @@
+{
+  "name": "{plugin-name}",
+  "version": "1.0.0",
+  "description": "{Plugin Name} Plugin",
+  "author": "govwordpress@gov.bc.ca",
+  "license": "GPL-2.0-or-later",
+  "keywords": [
+    "WordPress",
+    "Block Theme",
+    "BCGov",
+    "Plugin",
+    "Gutenberg"
+  ],
+  "homepage": "{plugin-url}#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+{plugin-url}.git"
+  },
+  "bugs": {
+    "url": "{plugin-url}#readme",
+    "email": "govwordpress@gov.bc.ca"
+  },
+  "engines": {
+    "npm": ">= 10.9.2",
+    "node": ">= 22.16.0"
+  },
+  "main": "index.js",
+  "devDependencies": {
+    "@bcgov/wordpress-eslint": "git+https://github.com/bcgov/wordpress-eslint.git#semver:1.x",
+    "@bcgov/wordpress-stylelintrc": "git+https://github.com/bcgov/wordpress-stylelintrc.git#semver:1.x",
+    "ajv": "^8.17.1",
+    "ajv-keywords": "^5.1.0",
+    "@wordpress/scripts": "^30.17.0"
+  },
+  "dependencies": {
+    "npm": "^11.4.1"
+  },
+  "scripts": {
+    "start": "wp-scripts start",
+    "build": "wp-scripts build",
+    "lint:css": "wp-scripts lint-style 'src/**/*.scss' --allow-empty-input",
+    "fix:css": "wp-scripts lint-style 'src/**/*.scss' --fix --allow-empty-input",
+    "lint:js": "wp-scripts lint-js 'src/**/*.js'",
+    "fix:js": "wp-scripts lint-js 'src/**/*.js' --fix",
+    "test": "npm run test:unit",
+    "test:unit": "wp-scripts test-unit-js --passWithNoTests"
+  }
+}
