@@ -1,94 +1,76 @@
-# WordPress Plugin Template
+# wordpress-document-repository
+This repo contains the code for the Wordpress Document Repository, a plugin that enhances the ability to upload and manage documents on your WordPress site.
 
-This repository provides a modern, well-structured template for developing WordPress plugins. It's designed to help developers quickly bootstrap new WordPress plugins with best practices, modern development tools, and a standardized structure.
+## Installation
 
-## Features
+### Requirements
 
-- Modern development environment with Composer for PHP dependencies
-- Block editor (Gutenberg) support with built-in block registration
-- ESLint configuration for JavaScript/TypeScript development
-- GitHub Actions workflows for automated testing and deployment
-- Standardized plugin structure following WordPress coding standards
-- Apache 2.0 License
-
-## Prerequisites
-
-- PHP 7.4 or higher
 - WordPress 6.4.4 or higher
-- Composer
-- Node.js and npm (for block development)
+- PHP 7.4 or higher
+- [Composer](https://getcomposer.org/) for PHP dependency management
+- Node 22.16.0
 
-## Getting Started
+### Setup
 
-1. **Create a new repository from this template**
-   - Click the "Use this template" button on GitHub
-   - Name your new repository
-   - Clone the new repository to your local machine
+1. **Clone the repository into your WordPress plugins directory:**
 
-2. **Update plugin information**
-   - Edit `plugin.php` and replace the placeholder values:
-     - `{Plugin Name}` with your plugin name
-     - `{plugin-name}` with your plugin slug
-     - `{PluginName}` with your plugin's namespace
-     - Update the description and other metadata
+    ```sh
+    git clone https://github.com/bcgov/wordpress-document-repository.git {plugin-directory}/wordpress-document-repository
+    ```
 
-3. **Install dependencies**
-   ```bash
-   composer install
-   ```
+2. **Install PHP dependencies using Composer:**
 
-4. **Development**
-   - Place your PHP classes in the `src` directory
-   - Create new blocks in the `Blocks` directory
-   - Use the provided namespace structure: `Bcgov\{PluginName}\{ClassName}`
+    ```sh
+    cd {plugin-directory}/wordpress-document-repository
+    composer install
+    ```
 
-5. **Building blocks**
-   ```bash
-   npm install
-   npm run build
-   ```
+3. **Install JavaScript dependencies and build assets:**
 
-## Project Structure
+    ```sh
+    npm install
+    npm run build
+    ```
 
-```
-├── Blocks/           # Gutenberg blocks
-├── src/             # PHP source files
-├── vendor/          # Composer dependencies
-├── workflows/       # GitHub Actions workflows
-├── plugin.php       # Main plugin file
-├── composer.json    # PHP dependencies
-└── package.json     # Node.js dependencies
+4. **Activate the plugin:**
+    - Go to the WordPress admin dashboard.
+    - Navigate to **Plugins**.
+    - Find **WordPress Document Repository** and click **Activate**.
+
+### Updating
+
+After **pulling new changes**, always run:
+
+```sh
+composer install
+npm install
+npm run build
 ```
 
-## Development Guidelines
+Before **pushing changes**, always run:
 
-1. **PHP Development**
-   - Follow PSR-4 autoloading standards
-   - Use namespaces for all classes
-   - Document your code with PHPDoc comments
+```sh
+npm run build
+composer production
+```
+---
+## Custom Hooks
 
-2. **Block Development**
-   - Create new blocks in the `Blocks` directory
-   - Use block.json for block registration
-   - Follow WordPress block development best practices
+### bcgov_document_repository_metadata_fields_updated
 
-3. **Testing**
-   - Write unit tests for your PHP code
-   - Test blocks in the WordPress block editor
-   - Ensure compatibility with WordPress versions specified in plugin.php
+**Description:**  
+Triggered whenever the metadata fields for the Document Repository are updated (e.g., when a field is added, edited, or deleted).
 
-## Contributing
+**When it's triggered:**  
+- After saving, updating, or deleting a metadata field.
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+**Parameters:**  
+None.
 
-## License
-
-This template is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
-
-## Support
-
-For questions or issues, please create an issue in the repository.
+**Usage Example:**
+```php
+add_action( 'bcgov_document_repository_metadata_fields_updated', function() {
+    // Your custom logic here, e.g., flush cache or re-register fields.
+} );
+```
+---

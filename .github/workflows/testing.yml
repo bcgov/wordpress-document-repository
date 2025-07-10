@@ -2,9 +2,7 @@ name: Testing
 
 on:
   pull_request:
-    branches:
-      - main
-      - release*
+  workflow_dispatch:
 
 jobs:
   tests:

@@ -2,7 +2,7 @@
    /**
     * Class PluginFunctionalityTest
     *
-    * @package WordPress_Search
+    * @package WordpressDocumentRepository
     */
 class PluginFunctionalityTest extends WP_UnitTestCase {
 	/**
