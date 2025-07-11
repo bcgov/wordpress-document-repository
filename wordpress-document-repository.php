@@ -64,6 +64,10 @@ $document_repository_settings->init();
 // Initialize Document Repository.
 $document_repository = new DocumentRepository();
 
+// Always register taxonomies first (needed in both admin and frontend).
+add_action( 'init', [ $document_repository, 'register_post_types' ] );
+add_action( 'init', [ $document_repository, 'register_metadata_taxonomies' ], 15 );
+
 // For admin area, initialize everything.
 if ( is_admin() ) {
     $document_repository->init();

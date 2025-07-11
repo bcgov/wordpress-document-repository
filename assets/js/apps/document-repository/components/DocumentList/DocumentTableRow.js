@@ -46,22 +46,14 @@ function DocumentTableRow( {
 					? document.metadata[ field.id ]
 					: '';
 
-			// For taxonomy fields, convert ID back to name for display
+			// For taxonomy fields, display the name values directly
 			if ( field.type === 'taxonomy' && fieldValue ) {
-				const matchingOption = ( field.options || [] ).find(
-					( option ) => {
-						if ( typeof option === 'string' ) {
-							return option === fieldValue;
-						}
-						return ( option.value || option.id ) === fieldValue;
-					}
-				);
-
-				if ( matchingOption ) {
-					return typeof matchingOption === 'string'
-						? matchingOption
-						: matchingOption.label || matchingOption.name;
-				}
+				// Handle arrays (for multiple selections) and single values
+				const values = Array.isArray( fieldValue )
+					? fieldValue
+					: [ fieldValue ];
+				// Return single value or comma-separated for multiple
+				return values.length === 1 ? values[ 0 ] : values.join( ', ' );
 			}
 
 			return fieldValue || '—';
@@ -81,7 +73,7 @@ function DocumentTableRow( {
 				}
 				return {
 					label: option.label || option.name,
-					value: option.value || option.id,
+					value: option.label || option.name,
 				};
 			} );
 

@@ -400,13 +400,15 @@ const MetadataApp = () => {
 				method: 'DELETE',
 			} );
 
-			// Then update the fields list
-			const updatedFields = state.fields.filter(
-				( field ) => field.id !== fieldId
-			);
+			// Then delete the field configuration from the server
 			const result = await deleteField( fieldId );
 
 			if ( result.success ) {
+				// Only update the state after successful server deletion
+				const updatedFields = state.fields.filter(
+					( field ) => field.id !== fieldId
+				);
+
 				setState( ( prev ) => ( {
 					...prev,
 					fields: updatedFields,
