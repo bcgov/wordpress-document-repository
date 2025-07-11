@@ -35,142 +35,67 @@ class DocumentPostType {
         $label     = $this->config->get( 'post_type_label' );
         $singular  = $this->config->get( 'post_type_singular' );
 
-        $labels = [
-            'name'                  => $label,
-            'singular_name'         => $singular,
-            'menu_name'             => $label,
-            'name_admin_bar'        => $singular,
-            'add_new'               => 'Add New',
-            'add_new_item'          => "Add New $singular",
-            'new_item'              => "New $singular",
-            'edit_item'             => "Edit $singular",
-            'view_item'             => "View $singular",
-            'all_items'             => "All $label",
-            'search_items'          => "Search $label",
-            'parent_item_colon'     => "Parent $label:",
-            'not_found'             => "No $label found.",
-            'not_found_in_trash'    => "No $label found in Trash.",
-            'archives'              => "$singular Archives",
-            'insert_into_item'      => "Insert into $singular",
-            'uploaded_to_this_item' => "Uploaded to this $singular",
-            'filter_items_list'     => "Filter $label list",
-            'items_list_navigation' => "$label list navigation",
-            'items_list'            => "$label list",
-        ];
-
         $args = [
-            'labels'             => $labels,
-            'public'             => true,
-            'publicly_queryable' => true,
-            'show_ui'            => true,
-            'show_in_menu'       => false,
-            'query_var'          => false,
-            'rewrite'            => false,
-            'capability_type'    => 'post',
-            'has_archive'        => false,
-            'hierarchical'       => false,
-            'menu_position'      => $this->config->get( 'menu_position' ),
-            'menu_icon'          => $this->config->get( 'menu_icon' ),
-            'supports'           => [ 'title', 'author', 'custom-fields' ],
-            'capabilities'       => [
-                'create_posts'       => $this->config->get_capability(),
-                'edit_post'          => $this->config->get_capability(),
-                'read_post'          => $this->config->get_capability(),
-                'delete_post'        => $this->config->get_capability(),
-                'edit_posts'         => $this->config->get_capability(),
-                'edit_others_posts'  => $this->config->get_capability(),
-                'publish_posts'      => $this->config->get_capability(),
-                'read_private_posts' => $this->config->get_capability(),
+            'labels'              => [
+                'name'                  => $label,
+                'singular_name'         => $singular,
+                'add_new'               => sprintf( 'Add New %s', $singular ),
+                'add_new_item'          => sprintf( 'Add New %s', $singular ),
+                'edit_item'             => sprintf( 'Edit %s', $singular ),
+                'new_item'              => sprintf( 'New %s', $singular ),
+                'view_item'             => sprintf( 'View %s', $singular ),
+                'view_items'            => sprintf( 'View %s', $label ),
+                'search_items'          => sprintf( 'Search %s', $label ),
+                'not_found'             => sprintf( 'No %s found', strtolower( $label ) ),
+                'not_found_in_trash'    => sprintf( 'No %s found in Trash', strtolower( $label ) ),
+                'parent_item_colon'     => sprintf( 'Parent %s:', $singular ),
+                'all_items'             => sprintf( 'All %s', $label ),
+                'archives'              => sprintf( '%s Archives', $singular ),
+                'attributes'            => sprintf( '%s Attributes', $singular ),
+                'insert_into_item'      => sprintf( 'Insert into %s', strtolower( $singular ) ),
+                'uploaded_to_this_item' => sprintf( 'Uploaded to this %s', strtolower( $singular ) ),
+                'featured_image'        => 'Featured Image',
+                'set_featured_image'    => 'Set featured image',
+                'remove_featured_image' => 'Remove featured image',
+                'use_featured_image'    => 'Use as featured image',
+                'menu_name'             => $label,
+                'filter_items_list'     => sprintf( 'Filter %s list', $label ),
+                'items_list_navigation' => sprintf( '%s list navigation', $label ),
+                'items_list'            => sprintf( '%s list', $label ),
             ],
-            'show_in_rest'       => true,
+            'supports'            => [ 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'custom-fields' ],
+            'hierarchical'        => false,
+            'public'              => true,
+            'show_ui'             => true,
+            'show_in_menu'        => true,
+            'menu_position'       => $this->config->get( 'menu_position' ),
+            'menu_icon'           => $this->config->get( 'menu_icon' ),
+            'show_in_admin_bar'   => true,
+            'show_in_nav_menus'   => false,
+            'can_export'          => true,
+            'has_archive'         => false,
+            'exclude_from_search' => false,
+            'publicly_queryable'  => true,
+            'capability_type'     => 'post',
+            'show_in_rest'        => true,
+            'rest_base'           => $post_type,
         ];
 
         register_post_type( $post_type, $args );
 
-        // Register custom taxonomies if needed.
-        $this->register_taxonomies();
-
-        // Register metadata fields with WordPress REST API.
-        $this->register_metadata_rest_fields();
-
-        // Register taxonomy fields.
-        $this->register_taxonomy_fields();
+        // Register metadata fields for REST API.
+        $this->register_metadata_fields();
 
         // Hide document attachments from media library.
         add_filter( 'ajax_query_attachments_args', [ $this, 'hide_document_attachments' ] );
     }
 
     /**
-     * Register metadata fields with WordPress REST API.
-     * This makes the metadata accessible through the default WordPress REST API endpoints.
-     *
-     * This is a public method that can be called to re-register metadata fields
-     * when they are updated.
+     * Register metadata fields for REST API exposure.
      */
     public function register_metadata_fields(): void {
-        $this->register_metadata_rest_fields();
-        $this->register_taxonomy_fields();
-    }
-
-    /**
-     * Register metadata fields with WordPress REST API.
-     * This makes the metadata accessible through the default WordPress REST API endpoints.
-     */
-    private function register_metadata_rest_fields(): void {
         $post_type = $this->config->get_post_type();
 
-        // Get configured metadata fields from the options table.
-        $metadata_fields = get_option( 'document_repository_metadata_fields', [] );
-
-        // Register each metadata field with WordPress REST API.
-        foreach ( $metadata_fields as $field ) {
-            $field_id   = $field['id'];
-            $field_type = $field['type'];
-
-            // Determine the proper schema type for REST API.
-            $schema_type   = 'string'; // Default.
-            $schema_format = null;
-
-            switch ( $field_type ) {
-                case 'date':
-                    $schema_type   = 'string';
-                    $schema_format = 'date';
-                    break;
-                case 'text':
-                default:
-                    $schema_type = 'string';
-                    break;
-            }
-
-            // Build the schema.
-            $schema = [
-                'type'         => $schema_type,
-                'description'  => $field['label'] ?? $field_id,
-                'show_in_rest' => true,
-                'single'       => true,
-            ];
-
-            if ( $schema_format ) {
-                $schema['format'] = $schema_format;
-            }
-
-            // Register the meta field.
-            register_post_meta( $post_type, $field_id, $schema );
-        }
-
-        // Also register the document file ID field.
-        register_post_meta(
-            $post_type,
-            'document_file_id',
-            [
-				'type'         => 'integer',
-				'description'  => 'Document file attachment ID',
-				'show_in_rest' => true,
-				'single'       => true,
-			]
-        );
-
-        // Register other standard document metadata fields.
         $standard_fields = [
             'document_file_url'  => [
                 'type'         => 'string',
@@ -205,90 +130,111 @@ class DocumentPostType {
 
     /**
      * Register taxonomies for taxonomy-type metadata fields.
+     * This should be called on the init hook.
      */
-    private function register_taxonomy_fields(): void {
+    public function register_metadata_taxonomies(): void {
+        // Prevent multiple registrations in the same request.
+        static $already_registered = false;
+        if ( $already_registered ) {
+            return;
+        }
+        $already_registered = true;
+
         $metadata_fields = get_option( 'document_repository_metadata_fields', [] );
+        $post_type       = $this->config->get_post_type();
 
         foreach ( $metadata_fields as $field ) {
             if ( 'taxonomy' === $field['type'] ) {
-                // Use the metadata manager to register the taxonomy.
-                $metadata_manager = new DocumentMetadataManager( $this->config );
-                $metadata_manager->register_field_taxonomy(
-                    $field['id'],
-                    $field['label'],
-                    $field['options'] ?? []
+                $field_id      = $field['id'];
+                $field_label   = $field['label'];
+                $field_options = $field['options'] ?? [];
+
+                // Create clean taxonomy name with doc_ prefix.
+                $taxonomy_name = 'doc_' . sanitize_title( $field_id );
+
+                // Skip if taxonomy already exists.
+                if ( taxonomy_exists( $taxonomy_name ) ) {
+                    continue;
+                }
+
+                // Prepare taxonomy labels.
+                $labels = [
+                    'name'          => $field_label,
+                    'singular_name' => $field_label,
+                    'search_items'  => sprintf( 'Search %s', $field_label ),
+                    'all_items'     => sprintf( 'All %s', $field_label ),
+                    'edit_item'     => sprintf( 'Edit %s', $field_label ),
+                    'update_item'   => sprintf( 'Update %s', $field_label ),
+                    'add_new_item'  => sprintf( 'Add New %s', $field_label ),
+                    'new_item_name' => sprintf( 'New %s Name', $field_label ),
+                    'menu_name'     => $field_label,
+                ];
+
+                // Register the taxonomy.
+                $result = register_taxonomy(
+                    $taxonomy_name,
+                    $post_type,
+                    [
+						'labels'            => $labels,
+						'hierarchical'      => false,
+						'show_ui'           => true,
+						'show_admin_column' => true,
+						'query_var'         => false,
+						'rewrite'           => false,
+						'show_in_rest'      => true,
+						'meta_box_cb'       => false, // We'll handle the UI ourselves.
+					]
                 );
+
+                // Create terms for this taxonomy.
+                if ( ! is_wp_error( $result ) && ! empty( $field_options ) ) {
+                    $this->create_taxonomy_terms( $taxonomy_name, $field_options );
+                }
             }
         }
     }
 
     /**
-     * Register any custom taxonomies for documents.
+     * Create terms for a taxonomy.
+     *
+     * @param string $taxonomy_name Taxonomy name.
+     * @param array  $terms Array of term names.
      */
-    private function register_taxonomies(): void {
-        $post_type = $this->config->get_post_type();
+    private function create_taxonomy_terms( string $taxonomy_name, array $terms ): void {
 
-        // Document categories.
-        register_taxonomy(
-            'document_category',
-            $post_type,
-            [
-                'labels'            => [
-                    'name'                       => 'Categories',
-                    'singular_name'              => 'Category',
-                    'search_items'               => 'Search Categories',
-                    'popular_items'              => 'Popular Categories',
-                    'all_items'                  => 'All Categories',
-                    'parent_item'                => 'Parent Category',
-                    'parent_item_colon'          => 'Parent Category:',
-                    'edit_item'                  => 'Edit Category',
-                    'update_item'                => 'Update Category',
-                    'add_new_item'               => 'Add New Category',
-                    'new_item_name'              => 'New Category Name',
-                    'separate_items_with_commas' => 'Separate categories with commas',
-                    'add_or_remove_items'        => 'Add or remove categories',
-                    'choose_from_most_used'      => 'Choose from the most used categories',
-                    'menu_name'                  => 'Categories',
-                ],
-                'hierarchical'      => true,
-                'show_ui'           => true,
-                'show_admin_column' => true,
-                'query_var'         => false,
-                'rewrite'           => false,
-                'show_in_rest'      => true,
-            ]
-        );
+        foreach ( $terms as $term_data ) {
+            $term_name = '';
 
-        // Document tags.
-        register_taxonomy(
-            'document_tag',
-            $post_type,
-            [
-                'labels'            => [
-                    'name'                       => 'Tags',
-                    'singular_name'              => 'Tag',
-                    'search_items'               => 'Search Tags',
-                    'popular_items'              => 'Popular Tags',
-                    'all_items'                  => 'All Tags',
-                    'parent_item'                => null,
-                    'parent_item_colon'          => null,
-                    'edit_item'                  => 'Edit Tag',
-                    'update_item'                => 'Update Tag',
-                    'add_new_item'               => 'Add New Tag',
-                    'new_item_name'              => 'New Tag Name',
-                    'separate_items_with_commas' => 'Separate tags with commas',
-                    'add_or_remove_items'        => 'Add or remove tags',
-                    'choose_from_most_used'      => 'Choose from the most used tags',
-                    'menu_name'                  => 'Tags',
-                ],
-                'hierarchical'      => false,
-                'show_ui'           => true,
-                'show_admin_column' => true,
-                'query_var'         => false,
-                'rewrite'           => false,
-                'show_in_rest'      => true,
-            ]
-        );
+            // Handle both string values and objects.
+            if ( is_array( $term_data ) || is_object( $term_data ) ) {
+                $term_array = (array) $term_data;
+                if ( isset( $term_array['name'] ) ) {
+                    $term_name = $term_array['name'];
+                } elseif ( isset( $term_array['label'] ) ) {
+                    $term_name = $term_array['label'];
+                } else {
+                    continue;
+                }
+            } elseif ( is_string( $term_data ) ) {
+                $term_name = $term_data;
+            } else {
+                continue;
+            }
+
+            $term_name = trim( (string) $term_name );
+            if ( empty( $term_name ) ) {
+                continue;
+            }
+
+            // Check if term already exists.
+            $existing_term = get_term_by( 'name', $term_name, $taxonomy_name );
+            if ( $existing_term ) {
+                continue;
+            }
+
+            // Create the term.
+            $result = wp_insert_term( $term_name, $taxonomy_name );
+        }
     }
 
     /**

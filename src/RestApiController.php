@@ -9,7 +9,7 @@ use WP_REST_Response;
 use WP_Error;
 
 /**
- * RestApiController - REST API Endpoints Handler
+ * RestApiController - REST API Endpoints Handler.
  *
  * This service registers and processes all REST API endpoints for the Document Repository.
  */
@@ -536,19 +536,9 @@ class RestApiController {
      * @return WP_REST_Response|WP_Error The response object or error.
      */
     public function add_metadata_field( WP_REST_Request $request ) {
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            do_action( 'bcgov_design_system_debug', 'RestApiController::add_metadata_field called' );
-        }
-
         $field = $request->get_params();
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            do_action( 'bcgov_design_system_debug', 'Field data: ' . wp_json_encode( $field ) );
-        }
 
         if ( ! isset( $field['id'] ) || ! isset( $field['label'] ) || ! isset( $field['type'] ) ) {
-            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                do_action( 'bcgov_design_system_debug', 'Validation failed - missing required fields' );
-            }
             return new WP_Error(
                 'invalid_field',
                 'Field must have id, label, and type',
@@ -557,14 +547,8 @@ class RestApiController {
         }
 
         $result = $this->metadata_manager->add_metadata_field( $field );
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            do_action( 'bcgov_design_system_debug', 'Metadata manager result: ' . ( $result ? 'SUCCESS' : 'FAILED' ) );
-        }
 
         if ( ! $result ) {
-            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                do_action( 'bcgov_design_system_debug', 'Failed - field exists or other error' );
-            }
             return new WP_Error(
                 'field_exists',
                 'A field with this ID already exists',
@@ -572,9 +556,6 @@ class RestApiController {
             );
         }
 
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            do_action( 'bcgov_design_system_debug', 'Successful - returning field' );
-        }
         return new WP_REST_Response( $field, 201 );
     }
 
@@ -670,6 +651,16 @@ class RestApiController {
     public function cleanup_metadata_field( WP_REST_Request $request ) {
         $field_id = $request->get_param( 'id' );
 
+        // Get the field definition to check if it's a taxonomy field.
+        $metadata_fields  = $this->metadata_manager->get_metadata_fields();
+        $field_definition = null;
+        foreach ( $metadata_fields as $field ) {
+            if ( $field['id'] === $field_id ) {
+                $field_definition = $field;
+                break;
+            }
+        }
+
         // Get all documents.
         $args = [
             'post_type'      => $this->config->get_post_type(),
@@ -681,18 +672,46 @@ class RestApiController {
         $query        = new \WP_Query( $args );
         $document_ids = $query->posts;
 
-        // Delete the metadata from each document.
-        foreach ( $document_ids as $doc_id ) {
-            delete_post_meta( $doc_id, $field_id );
+        $documents_affected = 0;
+
+        // Handle cleanup based on field type.
+        if ( $field_definition && 'taxonomy' === $field_definition['type'] ) {
+            // For taxonomy fields, remove term relationships.
+            $taxonomy_name = $this->metadata_manager->get_taxonomy_name_for_field( $field_id );
+
+            foreach ( $document_ids as $doc_id ) {
+                // Get current terms for this document.
+                $current_terms = wp_get_object_terms( $doc_id, $taxonomy_name, [ 'fields' => 'ids' ] );
+                if ( ! is_wp_error( $current_terms ) && ! empty( $current_terms ) ) {
+                    // Clear all terms for this taxonomy.
+                    wp_set_object_terms( $doc_id, [], $taxonomy_name );
+                    ++$documents_affected;
+                }
+            }
+
+            $cleanup_type = 'taxonomy relationships';
+        } else {
+            // For regular metadata fields, delete post meta.
+            foreach ( $document_ids as $doc_id ) {
+                $meta_value = get_post_meta( $doc_id, $field_id, true );
+                if ( ! empty( $meta_value ) ) {
+                    delete_post_meta( $doc_id, $field_id );
+                    ++$documents_affected;
+                }
+            }
+
+            $cleanup_type = 'post metadata';
         }
 
-        /* translators: 1: Field ID, 2: Number of documents. */
-        $message = __( 'Metadata field "%1$s" has been removed from %2$d documents', 'bcgov-design-system' );
-        $message = sprintf( $message, $field_id, count( $document_ids ) );
+        /* translators: 1: Field ID, 2: Number of documents, 3: Cleanup type. */
+        $message = __( 'Metadata field "%1$s" %3$s has been removed from %2$d documents', 'bcgov-design-system' );
+        $message = sprintf( $message, $field_id, $documents_affected, $cleanup_type );
 
         return new WP_REST_Response(
             [
-                'message' => $message,
+                'message'            => $message,
+                'documents_affected' => $documents_affected,
+                'cleanup_type'       => $cleanup_type,
             ],
             200
         );

@@ -413,12 +413,20 @@ const useMetadataManagement = ( {
 			);
 
 			// Process results
+			const docIds = Object.keys( bulkEditedMetadata );
 			const failed = results
 				.map( ( result, index ) => ( {
 					result,
-					docId: Object.keys( bulkEditedMetadata )[ index ],
+					docId: docIds[ index ],
 				} ) )
 				.filter( ( { result } ) => result.status === 'rejected' );
+
+			const successful = results
+				.map( ( result, index ) => ( {
+					result,
+					docId: docIds[ index ],
+				} ) )
+				.filter( ( { result } ) => result.status === 'fulfilled' );
 
 			if ( failed.length > 0 ) {
 				// Handle failed operations
@@ -446,7 +454,28 @@ const useMetadataManagement = ( {
 						0 // Don't auto-dismiss
 					);
 				}
-			} else {
+			}
+
+			// Update local documents with successful API responses (contains properly formatted data)
+			if ( successful.length > 0 ) {
+				const updatedDocuments = localDocuments.map( ( doc ) => {
+					const successfulUpdate = successful.find(
+						( { docId } ) => docId === doc.id.toString()
+					);
+					if ( successfulUpdate ) {
+						// Use the fresh data from API response which has properly formatted taxonomy values
+						return successfulUpdate.result.value;
+					}
+					return doc;
+				} );
+
+				// Update parent component with refreshed data
+				if ( typeof onUpdateDocuments === 'function' ) {
+					onUpdateDocuments( updatedDocuments );
+				}
+			}
+
+			if ( failed.length === 0 ) {
 				// All updates successful
 				if ( onShowNotification ) {
 					onShowNotification(

@@ -77,14 +77,15 @@ class DocumentRepository {
      * @return void
      */
     public function init_frontend(): void {
-        // Register post types for frontend visibility.
-        add_action( 'init', [ $this, 'register_post_types' ] );
+        // Note: Post types and taxonomies are registered in the main plugin file.
+        // to avoid duplicate registrations between admin and frontend.
 
         // Register REST routes for frontend access if needed.
         add_action( 'rest_api_init', [ $this, 'register_rest_routes' ], 10 );
 
         // Hook to re-register metadata fields when they are updated (frontend).
         add_action( 'bcgov_document_repository_metadata_fields_updated', [ $this->get_document_post_type_instance(), 'register_metadata_fields' ] );
+        add_action( 'bcgov_document_repository_metadata_fields_updated', [ $this, 'register_metadata_taxonomies' ] );
     }
 
     /**
@@ -94,8 +95,9 @@ class DocumentRepository {
      * @return void
      */
     public function init(): void {
-        // Core WordPress integration hooks.
-        add_action( 'init', [ $this, 'register_post_types' ] );
+        // Note: Post types and taxonomies are registered in the main plugin file.
+        // to avoid duplicate registrations between admin and frontend.
+
         add_action( 'rest_api_init', [ $this, 'register_rest_routes' ], 10 );
         add_action( 'admin_menu', [ $this, 'register_admin_menus' ] );
         add_action( 'admin_enqueue_scripts', [ $this->get_admin_ui_manager_instance(), 'enqueue_admin_scripts' ] );
@@ -108,9 +110,18 @@ class DocumentRepository {
 
         // Hook to re-register metadata fields when they are updated.
         add_action( 'bcgov_document_repository_metadata_fields_updated', [ $this->get_document_post_type_instance(), 'register_metadata_fields' ] );
+        add_action( 'bcgov_document_repository_metadata_fields_updated', [ $this, 'register_metadata_taxonomies' ] );
 
         // Migrate existing files to the new direct path structure.
         add_action( 'admin_init', [ $this, 'migrate_existing_files' ] );
+    }
+
+    /**
+     * Register metadata taxonomies.
+     * This is called on the init hook with priority 15 to ensure post types are registered first.
+     */
+    public function register_metadata_taxonomies(): void {
+        $this->get_document_post_type_instance()->register_metadata_taxonomies();
     }
 
     /**
