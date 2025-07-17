@@ -545,6 +545,7 @@ class RestApiController {
         $id    = (int) $request->get_param( 'id' );
         $post  = get_post( $id );
         $force = $request->get_param( 'force' );
+        $force = ( true === $force || 'true' === $force || 1 === $force || '1' === $force );
         if ( ! $post || $post->post_type !== $this->config->get_post_type() ) {
             return new WP_Error(
                 'document_not_found',
