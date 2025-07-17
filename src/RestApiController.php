@@ -67,6 +67,14 @@ class RestApiController {
                     'methods'             => 'GET',
                     'callback'            => [ $this, 'get_documents' ],
                     'permission_callback' => [ $this, 'check_read_permission' ],
+                    'args'                => [
+                        'status' => [
+                            'type'              => 'string',
+                            'default'           => 'publish',
+                            'description'       => 'Filter documents by post status: publish, draft, trash, any, or all',
+                            'sanitize_callback' => 'sanitize_text_field',
+                        ],
+                    ],
                 ],
                 [
                     'methods'             => 'POST',
@@ -94,6 +102,42 @@ class RestApiController {
                     'methods'             => 'DELETE',
                     'callback'            => [ $this, 'delete_document' ],
                     'permission_callback' => [ $this, 'check_edit_permission' ],
+                    'args'                => [
+                        'id'    => [
+                            'required' => true,
+                            'type'     => 'integer',
+                        ],
+                        'force' => [
+                            'required'          => false,
+                            'type'              => 'boolean',
+                            'default'           => false,
+                            'sanitize_callback' => function ( $value ) {
+                                // Accept only actual boolean or string 'false'.
+                                if ( true === $value || 'true' === $value || 1 === $value || '1' === $value ) {
+                                    return true;
+                                }
+                                return false;
+                            },
+                        ],
+                    ],
+                ],
+            ]
+        );
+
+        register_rest_route(
+            $namespace,
+            '/documents/(?P<id>\d+)/restore',
+            [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [ $this, 'restore_document' ],
+                    'permission_callback' => [ $this, 'check_edit_permission' ],
+                    'args'                => [
+                        'id' => [
+                            'required' => true,
+                            'type'     => 'integer',
+                        ],
+                    ],
                 ],
             ]
         );
@@ -266,6 +310,7 @@ class RestApiController {
         $search   = $request->get_param( 'search' ) ?? '';
         $orderby  = $request->get_param( 'orderby' ) ?? 'date';
         $order    = $request->get_param( 'order' ) ?? 'DESC';
+        $status   = $request->get_param( 'status' ) ?? 'publish';
 
         // Build meta query if filters are provided.
         $meta_query = [];
@@ -293,8 +338,13 @@ class RestApiController {
                 'orderby'    => $orderby,
                 'order'      => $order,
                 'meta_query' => $meta_query,
+                'status'     => $status,
             ]
         );
+
+        // Add status counts after the document results are fetched.
+        $status_counts           = $this->metadata_manager->get_document_status_counts();
+        $result['status_counts'] = $status_counts;
 
         return new WP_REST_Response( $result, 200 );
     }
@@ -492,9 +542,10 @@ class RestApiController {
      * @return WP_REST_Response|WP_Error The response object or error.
      */
     public function delete_document( WP_REST_Request $request ) {
-        $id   = (int) $request->get_param( 'id' );
-        $post = get_post( $id );
-
+        $id    = (int) $request->get_param( 'id' );
+        $post  = get_post( $id );
+        $force = $request->get_param( 'force' );
+        $force = ( true === $force || 'true' === $force || 1 === $force || '1' === $force );
         if ( ! $post || $post->post_type !== $this->config->get_post_type() ) {
             return new WP_Error(
                 'document_not_found',
@@ -503,7 +554,11 @@ class RestApiController {
             );
         }
 
-        $result = $this->uploader->delete_document( $id );
+        if ( $force ) {
+            $result = $this->uploader->delete_document( $id );
+        } else {
+            $result = $this->uploader->trash_document( $id );
+        }
 
         if ( ! $result ) {
             return new WP_Error(
@@ -517,6 +572,49 @@ class RestApiController {
         $this->metadata_manager->clear_cache();
 
         return new WP_REST_Response( null, 204 );
+    }
+
+    /**
+     * Restore a trashed document.
+     *
+     * @param WP_REST_Request $request The request object.
+     * @return WP_REST_Response|WP_Error The response object or error.
+     */
+    public function restore_document( WP_REST_Request $request ) {
+        $id   = (int) $request->get_param( 'id' );
+        $post = get_post( $id );
+
+        if ( ! $post || $post->post_type !== $this->config->get_post_type() ) {
+            return new WP_Error(
+                'document_not_found',
+                'Document not found',
+                [ 'status' => 404 ]
+            );
+        }
+
+        if ( 'trash' !== $post->post_status ) {
+            return new WP_Error(
+                'document_not_trashed',
+                'Document is not currently trashed',
+                [ 'status' => 400 ]
+            );
+        }
+
+        $result = $this->uploader->restore_document( $id );
+
+        if ( ! $result ) {
+            return new WP_Error(
+                'restore_failed',
+                'Failed to restore the document',
+                [ 'status' => 500 ]
+            );
+        }
+
+        $this->metadata_manager->clear_cache();
+
+        $document = $this->uploader->get_document_data( $id );
+
+        return new WP_REST_Response( $document, 200 );
     }
 
     /**

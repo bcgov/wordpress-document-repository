@@ -9,6 +9,7 @@ import MetadataModal from '../../../shared/components/MetadataModal';
 import UploadArea from './UploadArea';
 import PaginationControls from './PaginationControls';
 import RetryNotice from './RetryNotice';
+import { isAllView, isTrashView } from '../../utils/documentStatus';
 
 // Import custom hooks
 import useNotifications from './hooks/useNotifications';
@@ -26,19 +27,24 @@ const VIRTUALIZATION_THRESHOLD = 50; // Use virtualization when there are more t
  * Main component for managing and displaying a list of documents with metadata.
  * Handles document uploads, metadata editing, bulk operations, and pagination.
  *
- * @param {Object}   props                   - Component props
- * @param {Array}    props.documents         - List of document objects to display
- * @param {number}   props.currentPage       - Current page number for pagination
- * @param {number}   props.totalPages        - Total number of pages
- * @param {Function} props.onPageChange      - Callback when page changes
- * @param {Function} props.onDelete          - Callback when a document is deleted
- * @param {boolean}  props.isDeleting        - Flag indicating if a delete operation is in progress
- * @param {Array}    props.selectedDocuments - Array of selected document IDs
- * @param {Function} props.onSelectDocument  - Callback when a document is selected
- * @param {Function} props.onSelectAll       - Callback when all documents are selected/deselected
- * @param {Function} props.onFileDrop        - Callback when files are dropped/uploaded
- * @param {Function} props.onDocumentsUpdate - Callback when documents are updated
- * @param {Array}    props.metadataFields    - Array of metadata field definitions
+ * @param {Object}   props                      - Component props
+ * @param {Array}    props.documents            - List of document objects to display
+ * @param {number}   props.currentPage          - Current page number for pagination
+ * @param {number}   props.totalPages           - Total number of pages
+ * @param {Function} props.onPageChange         - Callback when page changes
+ * @param {Function} props.onDelete             - Callback when a document is deleted
+ * @param {Function} props.onTrash              - Callback when a document is moved to trash
+ * @param {Function} props.onRestore            - Function to restore a document from the trash
+ * @param {boolean}  props.isDeleting           - Flag indicating if a delete operation is in progress
+ * @param {Array}    props.selectedDocuments    - Array of selected document IDs
+ * @param {Function} props.onSelectDocument     - Callback when a document is selected
+ * @param {Function} props.onSelectAll          - Callback when all documents are selected/deselected
+ * @param {Function} props.onFileDrop           - Callback when files are dropped/uploaded
+ * @param {Function} props.onDocumentsUpdate    - Callback when documents are updated
+ * @param {Array}    props.metadataFields       - Array of metadata field definitions
+ * @param {Array} 	 props.statusCounts 	    - Array of number of documents of each status
+ * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
+ * @param {Function} props.onStatusFilterChange - Callback when filter changes
  */
 const DocumentList = ( {
 	documents = [],
@@ -46,6 +52,8 @@ const DocumentList = ( {
 	totalPages = 1,
 	onPageChange,
 	onDelete,
+	onTrash,
+	onRestore,
 	isDeleting = false,
 	selectedDocuments = [],
 	onSelectDocument,
@@ -53,6 +61,9 @@ const DocumentList = ( {
 	onFileDrop,
 	onDocumentsUpdate,
 	metadataFields = [],
+	statusCounts = {},
+	documentStatusFilter = 'all',
+  	onStatusFilterChange,
 } ) => {
 	// Memoize formatFileSize function
 	const formatFileSize = useMemo(
@@ -91,15 +102,26 @@ const DocumentList = ( {
 	// Use document management hook
 	const {
 		deleteDocument,
+		restoreDocument,
 		bulkDeleteConfirmOpen,
+		bulkRestoreConfirmOpen,
 		isMultiDeleting,
+		isMultiRestoring,
 		setDeleteDocument,
+		setRestoreDocument,
 		handleBulkDelete,
+		handleBulkRestore,
 		handleSingleDelete,
+		handleSingleRestore,
 		openBulkDeleteConfirm,
 		closeBulkDeleteConfirm,
+		openBulkRestoreConfirm,
+		closeBulkRestoreConfirm,
 	} = useDocumentManagement( {
 		onDelete,
+		onTrash,
+		onRestore,
+		documentStatusFilter,
 		onSelectAll,
 		onShowNotification: showNotification,
 		onError: handleOperationError,
@@ -167,12 +189,14 @@ const DocumentList = ( {
 			onSelectAll,
 			onDelete: setDeleteDocument,
 			onEdit: handleEditMetadata,
+			onRestore: setRestoreDocument,
 			isDeleting,
 			metadataFields,
 			isSpreadsheetMode,
 			bulkEditedMetadata,
 			onMetadataChange: handleMetadataChange,
 			formatFileSize,
+			documentStatusFilter,
 		} ),
 		[
 			localDocuments,
@@ -187,12 +211,32 @@ const DocumentList = ( {
 			handleMetadataChange,
 			formatFileSize,
 			setDeleteDocument,
+			setRestoreDocument,
 		]
 	);
 
 	const handleFilesWithLog = ( files ) => {
 		handleFiles( files );
 	};
+
+	// Counts of all untrashed and trashed documents
+	const { totalDocumentCount, trashedCount } = useMemo( () => {
+		// Count all statuses except 'trash'
+		const total = Object.entries( statusCounts ).reduce( ( acc, [ key, val ] ) => {
+			if ( key !== 'trash' ) {
+			return acc + Number( val || 0 );
+			}
+			return acc;
+		}, 0);
+
+		// Trash count
+		const trash = Number( statusCounts.trash || 0 );
+
+		return {
+			totalDocumentCount: total,
+			trashedCount: trash,
+		};
+	}, [ statusCounts ] );
 
 	return (
 		<ErrorBoundary>
@@ -210,6 +254,34 @@ const DocumentList = ( {
 						<UploadArea onFilesSelected={ handleFilesWithLog } />
 					</div>
 				</div>
+
+				<ul className="subsubsub document-status-filters">
+					<li className="all">
+						<a
+						href="#"
+						className={ isAllView( documentStatusFilter ) ? 'current' : '' }
+						onClick={ ( e ) => {
+							e.preventDefault();
+							onStatusFilterChange && onStatusFilterChange( 'all' );
+						} }
+						>
+						{ __( 'All', 'bcgov-design-system' ) } <span className="count">( { totalDocumentCount } )</span>
+						</a>
+					</li>
+					<li className="trash">
+						{ ' | ' }
+						<a
+						href="#"
+						className={ isTrashView( documentStatusFilter ) ? 'current' : '' }
+						onClick={ ( e ) => {
+							e.preventDefault();
+							onStatusFilterChange && onStatusFilterChange( 'trash' );
+						} }
+						>
+						{ __( 'Trash', 'bcgov-design-system ' ) } <span className="count">( { trashedCount } )</span>
+						</a>
+					</li>
+				</ul>
 
 				<div className="document-list__table-actions">
 					<div className="action-buttons-container">
@@ -249,6 +321,20 @@ const DocumentList = ( {
 							</Button>
 						) }
 
+						{ isTrashView( documentStatusFilter ) && selectedDocuments.length > 0 && (
+							<Button
+								className="doc-repo-button save-button bulk-restore-button"
+								onClick={ openBulkRestoreConfirm }
+								disabled={ isMultiRestoring }
+							>
+								{ sprintf(
+								/* translators: %d: number of selected documents */
+								__( 'Restore Selected (%d)', 'bcgov-design-system' ),
+								selectedDocuments.length
+								) }
+							</Button>
+							) }
+	
 						{ selectedDocuments.length > 0 && (
 							<Button
 								className="doc-repo-button delete-button bulk-delete-button"
@@ -256,12 +342,14 @@ const DocumentList = ( {
 								disabled={ isMultiDeleting }
 							>
 								{ sprintf(
-									/* translators: %d: number of selected documents */
-									__(
-										'Delete Selected (%d)',
-										'bcgov-design-system'
-									),
-									selectedDocuments.length
+								/* translators: %d: number of selected documents */
+								__(
+									isTrashView( documentStatusFilter )
+									? 'Delete Selected Permanently (%d)'
+									: 'Trash Selected (%d)',
+									'bcgov-design-system'
+								),
+								selectedDocuments.length
 								) }
 							</Button>
 						) }
@@ -290,7 +378,11 @@ const DocumentList = ( {
 
 				{ deleteDocument && (
 					<MetadataModal
-						title={ __( 'Delete Document', 'bcgov-design-system' ) }
+						title={
+							isTrashView( documentStatusFilter )
+								? __( 'Delete Document Permanently', 'bcgov-design-system' )
+								: __( 'Trash Document', 'bcgov-design-system' )
+						}
 						isOpen={ !! deleteDocument }
 						onClose={ () => setDeleteDocument( null ) }
 						onSave={ () => handleSingleDelete( deleteDocument.id ) }
@@ -298,22 +390,36 @@ const DocumentList = ( {
 						isDisabled={ false }
 						saveButtonText={
 							isDeleting
-								? __( 'Deleting…', 'bcgov-design-system' )
-								: __( 'Delete', 'bcgov-design-system' )
+								? __(
+									isTrashView( documentStatusFilter )
+										? 'Deleting…'
+										: 'Trashing…',
+									'bcgov-design-system'
+								)
+								: __(
+									isTrashView( documentStatusFilter )
+										? 'Delete Permanently'
+										: 'Trash',
+									'bcgov-design-system'
+								)
 						}
 						saveButtonClassName="doc-repo-button delete-button"
 					>
 						<div className="delete-confirmation-content">
 							<div className="delete-warning">
 								{ __(
-									'Are you sure you want to delete this document? This action cannot be undone.',
+									isTrashView( documentStatusFilter )
+										? 'Are you sure you want to delete this document? This action cannot be undone.'
+										: 'Are you sure you want to trash this document?',
 									'bcgov-design-system'
 								) }
 							</div>
 							<div className="documents-to-delete">
 								<h4>
 									{ __(
-										'Document to be deleted:',
+										isTrashView( documentStatusFilter )
+											? 'Document to be deleted:'
+											: 'Document to be trashed:',
 										'bcgov-design-system'
 									) }
 								</h4>
@@ -325,13 +431,39 @@ const DocumentList = ( {
 					</MetadataModal>
 				) }
 
+				{ restoreDocument && (
+					<MetadataModal
+						title={ __( 'Restore Document', 'bcgov-design-system' ) }
+						isOpen={ !!restoreDocument }
+						onClose={ () => setRestoreDocument( null ) }
+						onSave={ () => handleSingleRestore( restoreDocument.id ) }
+						isSaving={ isDeleting }
+						isDisabled={ false }
+						saveButtonText={ __( 'Restore', 'bcgov-design-system' ) }
+						saveButtonClassName="doc-repo-button save-button"
+					>
+						<div className="restore-confirmation-content">
+							<div className="restore-warning">
+								{ __( 'Are you sure you want to restore this document?', 'bcgov-design-system' ) }
+							</div>
+							<div className="documents-to-restore">
+								<h4>{ __( 'Document to be restored:', 'bcgov-design-system' ) }</h4>
+								<ul>
+									<li>{ restoreDocument.title }</li>
+								</ul>
+							</div>
+						</div>
+					</MetadataModal>
+				) }
+
 				{ /* Bulk Delete Confirmation Modal */ }
 				{ bulkDeleteConfirmOpen && (
 					<MetadataModal
-						title={ __(
-							'Delete Selected Documents',
-							'bcgov-design-system'
-						) }
+						title={
+							isTrashView( documentStatusFilter )
+								? __( 'Delete Selected Documents Permanently', 'bcgov-design-system' )
+								: __( 'Trash Selected Documents', 'bcgov-design-system' )
+						}
 						isOpen={ bulkDeleteConfirmOpen }
 						onClose={ closeBulkDeleteConfirm }
 						onSave={ () => handleBulkDelete( selectedDocuments ) }
@@ -339,26 +471,36 @@ const DocumentList = ( {
 						isDisabled={ false }
 						saveButtonText={
 							isMultiDeleting
-								? __( 'Deleting…', 'bcgov-design-system' )
-								: __( 'Delete Selected', 'bcgov-design-system' )
+								? __(
+									isTrashView( documentStatusFilter )
+										? 'Deleting…'
+										: 'Trashing…',
+									'bcgov-design-system'
+								)
+								: __(
+									isTrashView( documentStatusFilter )
+										? 'Delete Selected Permanently'
+										: 'Trash Selected',
+									'bcgov-design-system'
+								)
 						}
 						saveButtonClassName="doc-repo-button delete-button"
 					>
 						<div className="delete-confirmation-content">
 							<div className="delete-warning">
 								{ __(
-									'Are you sure you want to delete the selected documents? This action cannot be undone.',
+									isTrashView( documentStatusFilter )
+										? 'Are you sure you want to delete the selected documents? This action cannot be undone.'
+										: 'Are you sure you want to trash the selected documents?',
 									'bcgov-design-system'
 								) }
 							</div>
 							<div className="documents-to-delete">
 								<h4>
 									{ sprintf(
-										/* translators: %d: number of selected documents */
-										__(
-											'Documents to be deleted (%d):',
-											'bcgov-design-system'
-										),
+										isTrashView( documentStatusFilter )
+											? __( 'Documents to be deleted (%d):', 'bcgov-design-system' )
+											: __( 'Documents to be trashed (%d):', 'bcgov-design-system' ),
 										selectedDocuments.length
 									) }
 								</h4>
@@ -371,6 +513,47 @@ const DocumentList = ( {
 											<li key={ doc.id }>
 												{ doc.title }
 											</li>
+										) ) }
+								</ul>
+							</div>
+						</div>
+					</MetadataModal>
+				) }
+
+				{ bulkRestoreConfirmOpen && (
+					<MetadataModal
+						title={ __( 'Restore Selected Documents', 'bcgov-design-system' ) }
+						isOpen={ bulkRestoreConfirmOpen }
+						onClose={ closeBulkRestoreConfirm }
+						onSave={ () => handleBulkRestore( selectedDocuments ) }
+						isSaving={ isMultiRestoring }
+						isDisabled={ false }
+						saveButtonText={
+							isMultiRestoring
+								? __( 'Restoring…', 'bcgov-design-system' )
+								: __( 'Restore Selected', 'bcgov-design-system' )
+						}
+						saveButtonClassName="doc-repo-button save-button"
+					>
+						<div className="restore-confirmation-content">
+							<div className="restore-warning">
+								{ __(
+									'Are you sure you want to restore the selected documents?',
+									'bcgov-design-system'
+								) }
+							</div>
+							<div className="documents-to-restore">
+								<h4>
+									{ sprintf(
+										__( 'Documents to be restored (%d):', 'bcgov-design-system' ),
+										selectedDocuments.length
+									) }
+								</h4>
+								<ul>
+									{ localDocuments
+										.filter( ( doc ) => selectedDocuments.includes( doc.id ) )
+										.map( ( doc ) => (
+											<li key={ doc.id }>{ doc.title }</li>
 										) ) }
 								</ul>
 							</div>
