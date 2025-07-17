@@ -16,6 +16,7 @@ import DocumentList from './components/DocumentList';
 import DocumentUploader from './components/DocumentUploader';
 import { useDocuments } from './hooks/useDocuments';
 import AppErrorBoundary from '../../shared/components/AppErrorBoundary';
+import { isAllView } from './utils/documentStatus';
 
 /**
  * Main App component
@@ -41,22 +42,27 @@ const App = () => {
 	const [ selectedFileForUpload, setSelectedFileForUpload ] =
 		useState( null );
 
+	// Document filtering and selection state
+	const [ documentStatusFilter, setDocumentStatusFilter ] = useState( 'all' );
+	const [ selectedDocuments, setSelectedDocuments ] = useState( [] );
+
 	// Document data and operations from custom hook
 	const {
 		documents,
 		totalDocuments,
 		currentPage,
 		totalPages,
+		statusCounts,
 		fetchDocuments,
 		deleteDocument,
+		trashDocument,
+		restoreDocument,
 		isDeleting,
 		isLoading: isLoadingDocuments,
 		error: documentsError,
 		setSearchParams,
 	} = useDocuments();
 
-	// Selected documents for bulk actions
-	const [ selectedDocuments, setSelectedDocuments ] = useState( [] );
 
 	// Initialize data on component mount
 	useEffect( () => {
@@ -150,6 +156,21 @@ const App = () => {
 
 		initializeData();
 	}, [ fetchDocuments ] );
+
+	/**
+	 * When switching between document views (all vs trash):
+	 * - Update the query params for API filtering
+	 * - Reset selected documents to avoid carrying over from previous view
+	 */
+	useEffect( () => {
+		setSearchParams( ( prev ) => ( {
+			...prev,
+			status: isAllView( documentStatusFilter ) ? undefined : documentStatusFilter,
+			page: 1,
+		}));
+
+		setSelectedDocuments( [] );
+	}, [ documentStatusFilter ] );
 
 	/**
 	 * Handle document selection for bulk actions
@@ -422,6 +443,8 @@ const App = () => {
 					totalPages={ totalPages || 1 }
 					onPageChange={ handlePageChange }
 					onDelete={ deleteDocument }
+					onTrash={ trashDocument }
+					onRestore={ restoreDocument }
 					isDeleting={ isDeleting }
 					selectedDocuments={ selectedDocuments || [] }
 					onSelectDocument={ handleDocumentSelection }
@@ -429,6 +452,9 @@ const App = () => {
 					metadataFields={ metadataFields || [] }
 					onUploadSuccess={ handleUploadSuccess }
 					onFileDrop={ handleFileDrop }
+					statusCounts={ statusCounts }
+					documentStatusFilter={ documentStatusFilter }
+  					onStatusFilterChange={setDocumentStatusFilter}
 				/>
 
 				{ /* Upload Modal */ }

@@ -37,6 +37,7 @@ export const useDocuments = () => {
 	const [ totalDocuments, setTotalDocuments ] = useState( 0 );
 	const [ currentPage, setCurrentPage ] = useState( 1 );
 	const [ totalPages, setTotalPages ] = useState( 1 );
+	const [ statusCounts, setStatusCounts ] = useState( {} );
 
 	// Loading and error states
 	const [ isLoading, setIsLoading ] = useState( false );
@@ -49,6 +50,7 @@ export const useDocuments = () => {
 		per_page: window.documentRepositorySettings?.perPage || 20,
 		orderby: 'date',
 		order: 'DESC',
+		status: 'all',
 	} );
 
 	/**
@@ -121,6 +123,7 @@ export const useDocuments = () => {
 			setTotalDocuments( response.total || 0 );
 			setCurrentPage( response.current_page || 1 );
 			setTotalPages( response.total_pages || 1 );
+			setStatusCounts( response.status_counts || {} );
 
 			// If we got no documents but the page number is greater than 1,
 			// we should reset to page 1
@@ -174,7 +177,7 @@ export const useDocuments = () => {
 
 			// Delete document from API
 			await apiFetch( {
-				path: `/${ apiNamespace }/documents/${ documentId }`,
+				path: `/${ apiNamespace }/documents/${ documentId }?force=true`,
 				method: 'DELETE',
 			} );
 
@@ -184,6 +187,68 @@ export const useDocuments = () => {
 			return true;
 		} catch ( err ) {
 			setError( err.message || 'Error deleting document' );
+			setIsDeleting( false );
+			return false;
+		}
+	};
+
+	/**
+	 * Trash a document (move to Trash instead of deleting permanently)
+	 *
+	 * @async
+	 * @function trashDocument
+	 * @param {number} documentId - Document ID to trash
+	 * @return {Promise<boolean>} Success status
+	 * @throws {Error} If trashing fails
+	 */
+	const trashDocument = async ( documentId ) => {
+		setIsDeleting( true );
+
+		try {
+			const { apiNamespace } = window.documentRepositorySettings;
+
+			// Trash the document using force: false
+			await apiFetch( {
+				path: `/${ apiNamespace }/documents/${ documentId }?force=false`,
+				method: 'DELETE',
+			} );
+
+			await fetchDocuments();
+			setIsDeleting( false );
+			return true;
+		} catch ( err ) {
+			setError( err.message || 'Error trashing document' );
+			setIsDeleting( false );
+			return false;
+		}
+	};
+
+	/**
+	 * Restore a document from trash (change status back to 'publish' or active)
+	 *
+	 * @async
+	 * @function restoreDocument
+	 * @param {number} documentId - Document ID to restore
+	 * @return {Promise<boolean>} Success status
+	 * @throws {Error} If restore fails
+	 */
+	const restoreDocument = async ( documentId ) => {
+		setIsDeleting( true );
+
+		try {
+			const { apiNamespace } = window.documentRepositorySettings;
+
+			// WordPress native restore endpoint
+			await apiFetch( {
+			path: `/${ apiNamespace }/documents/${ documentId }/restore`,
+			method: 'POST',
+			} );
+
+			await fetchDocuments();
+			setIsDeleting( false );
+			return true;
+		} catch ( err ) {
+			setError( err.message || 'Error restoring document' );
 			setIsDeleting( false );
 			return false;
 		}
@@ -274,6 +339,7 @@ export const useDocuments = () => {
 		totalDocuments,
 		currentPage,
 		totalPages,
+		statusCounts,
 
 		// Loading states
 		isLoading,
@@ -287,6 +353,8 @@ export const useDocuments = () => {
 		// Document operations
 		fetchDocuments,
 		deleteDocument,
+		trashDocument,
+		restoreDocument,
 		updateDocument,
 		bulkUpdateDocuments,
 		bulkDeleteDocuments,

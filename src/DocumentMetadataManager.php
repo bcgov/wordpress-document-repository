@@ -441,6 +441,16 @@ class DocumentMetadataManager {
     }
 
     /**
+     * Get counts of documents by post status.
+     *
+     * @return array Associative array of status => count.
+     */
+    public function get_document_status_counts(): array {
+        $counts = wp_count_posts( $this->config->get_post_type() );
+        return is_object( $counts ) ? (array) $counts : [];
+    }
+
+    /**
      * Save document metadata.
      *
      * @param int   $post_id Document post ID.
@@ -572,6 +582,18 @@ class DocumentMetadataManager {
 
         $args = wp_parse_args( $args, $defaults );
 
+        // Determine post status filter.
+        $status = $args['status'] ?? 'all';
+        switch ( $status ) {
+            case 'trash':
+                $post_status = [ 'trash' ];
+                break;
+            case 'all':
+            default:
+                $post_status = [ 'publish', 'draft', 'pending', 'private' ];
+                break;
+        }
+
         // Build query.
         $query_args = [
             'post_type'      => $this->config->get_post_type(),
@@ -579,7 +601,7 @@ class DocumentMetadataManager {
             'paged'          => $args['paged'],
             'orderby'        => $args['orderby'],
             'order'          => $args['order'],
-            'post_status'    => 'publish',
+            'post_status'    => $post_status,
         ];
 
         // Add search.

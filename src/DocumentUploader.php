@@ -425,4 +425,37 @@ class DocumentUploader {
 
         return true;
     }
+
+    /**
+     * Trash a document.
+     *
+     * @param int $document_id Document post ID.
+     * @return bool Whether the trashing was successful.
+     */
+    public function trash_document( int $document_id ): bool {
+        // Trash document post.
+        $result = wp_trash_post( $document_id );
+
+        if ( ! $result ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Restore a trashed document.
+     *
+     * @param int $id The document ID.
+     * @return bool True on success, false on failure.
+     */
+    public function restore_document( int $id ): bool {
+        $result = wp_untrash_post( $id );
+
+        if ( ! $result ) {
+            return false;
+        }
+
+        return true;
+    }
 }
