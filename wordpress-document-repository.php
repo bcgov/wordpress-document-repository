@@ -74,3 +74,23 @@ if ( is_admin() ) {
 } else { // For frontend, initialize only frontend-specific features.
     $document_repository->init_frontend();
 }
+
+// Override document search results.
+add_filter( 'post_type_link', 'wordpress_document_repository_override_permalink', 10, 2 );
+
+/**
+ * Override document post permalink in search results with the direct file URL.
+ *
+ * @param string  $post_link The default post permalink.
+ * @param WP_Post $post      The current post object.
+ * @return string             The modified or original permalink.
+ */
+function wordpress_document_repository_override_permalink( $post_link, $post ) {
+	if ( is_search() && isset( $post->post_type ) && 'document' === $post->post_type ) {
+		$file_url = get_post_meta( $post->ID, 'document_file_url', true );
+		if ( ! empty( $file_url ) ) {
+			return esc_url( $file_url );
+		}
+	}
+	return $post_link;
+}
