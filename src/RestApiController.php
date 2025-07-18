@@ -466,7 +466,7 @@ class RestApiController {
                 ? $params['categories']
                 : explode( ',', $params['categories'] );
 
-            wp_set_object_terms( $id, $categories, 'document_category' );
+            wp_set_object_terms( $id, $categories, 'category' );
         }
 
         // Update tags if provided.
@@ -475,7 +475,7 @@ class RestApiController {
                 ? $params['tags']
                 : explode( ',', $params['tags'] );
 
-            wp_set_object_terms( $id, $tags, 'document_tag' );
+            wp_set_object_terms( $id, $tags, 'tag' );
         }
 
         // Clear cache.
@@ -725,7 +725,7 @@ class RestApiController {
     public function get_categories(): WP_REST_Response {
         $terms = get_terms(
             [
-                'taxonomy'   => 'document_category',
+                'taxonomy'   => 'category',
                 'hide_empty' => false,
             ]
         );
@@ -745,7 +745,7 @@ class RestApiController {
     public function get_tags(): WP_REST_Response {
         $terms = get_terms(
             [
-                'taxonomy'   => 'document_tag',
+                'taxonomy'   => 'tag',
                 'hide_empty' => false,
             ]
         );

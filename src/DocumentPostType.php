@@ -150,7 +150,7 @@ class DocumentPostType {
                 $field_options = $field['options'] ?? [];
 
                 // Create clean taxonomy name with doc_ prefix.
-                $taxonomy_name = 'doc_' . sanitize_title( $field_id );
+                $taxonomy_name = sanitize_title( $field_id );
 
                 // Skip if taxonomy already exists.
                 if ( taxonomy_exists( $taxonomy_name ) ) {
