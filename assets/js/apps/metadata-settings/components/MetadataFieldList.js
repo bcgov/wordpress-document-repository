@@ -77,6 +77,9 @@ const MetadataFieldList = ( { fields, onEdit, onDelete, isSaving } ) => {
 						<p className="field-type">
 							Type: { FIELD_TYPES[ field.type ] }
 						</p>
+						<p className="field-description">
+							Description: { field.description }
+						</p>
 					</div>
 					<div className="metadata-field-actions">
 						<Button

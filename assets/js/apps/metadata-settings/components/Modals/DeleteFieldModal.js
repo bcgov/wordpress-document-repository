@@ -75,6 +75,10 @@ const DeleteFieldModal = ( {
 							{ __( 'Type:', 'bcgov-design-system' ) }
 						</div>
 						<div className="value">{ field.type }</div>
+						<div className="label">
+							{ __( 'Description:', 'bcgov-design-system' ) }
+						</div>
+						<div className="value">{ field.description }</div>
 					</div>
 				</div>
 

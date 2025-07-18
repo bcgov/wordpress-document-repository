@@ -221,6 +221,7 @@ const useMetadataFields = () => {
 			id: '',
 			label: '',
 			type: 'text',
+			description: '',
 			options: [],
 			_rawOptionsText: '',
 		} ),
