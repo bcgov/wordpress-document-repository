@@ -662,7 +662,7 @@ class DocumentMetadataManager {
      * @return string Taxonomy name.
      */
     public function get_taxonomy_name_for_field( string $field_id ): string {
-        return 'doc_' . sanitize_title( $field_id );
+        return sanitize_title( $field_id );
     }
 
     /**

@@ -316,7 +316,7 @@ class DocumentUploader {
                 ? $metadata['categories']
                 : explode( ',', $metadata['categories'] );
 
-            wp_set_object_terms( $post_id, $categories, 'document_category' );
+            wp_set_object_terms( $post_id, $categories, 'category' );
         }
 
         // Set document tags if provided.
@@ -325,7 +325,7 @@ class DocumentUploader {
                 ? $metadata['tags']
                 : explode( ',', $metadata['tags'] );
 
-            wp_set_object_terms( $post_id, $tags, 'document_tag' );
+            wp_set_object_terms( $post_id, $tags, 'tag' );
         }
 
         return $post_id;
