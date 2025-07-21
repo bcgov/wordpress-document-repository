@@ -476,6 +476,16 @@ class RestApiController {
             );
         }
 
+        // Update excerpt if provided.
+        if ( isset( $params['excerpt'] ) ) {
+            wp_update_post(
+                [
+                    'ID'           => $id,
+                    'post_excerpt' => sanitize_text_field( $params['excerpt'] ),
+                ]
+            );
+        }
+
         // Process metadata fields.
         $metadata_fields = $this->metadata_manager->get_metadata_fields();
         foreach ( $metadata_fields as $field ) {

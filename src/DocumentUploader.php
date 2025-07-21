@@ -353,6 +353,7 @@ class DocumentUploader {
             'title'    => $post->post_title,
             'date'     => $post->post_date,
             'author'   => get_the_author_meta( 'display_name', $post->post_author ),
+            'excerpt'  => $post->post_excerpt,
             'metadata' => $metadata_manager->get_document_metadata( $post->ID ),
         ];
     }

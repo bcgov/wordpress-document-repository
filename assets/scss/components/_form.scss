@@ -76,3 +76,20 @@ textarea:disabled {
 	gap: $spacing-md; // Add spacing between buttons
 	align-items: center;
 }
+
+// Auto-resize textarea for excerpt
+.excerpt-textarea {
+	min-height: 80px;
+	resize: vertical;
+	transition: height 0.2s ease;
+
+	&:focus {
+		min-height: 100px;
+	}
+
+	// Auto-resize functionality
+	&.components-textarea-control__input {
+		overflow: hidden;
+		word-wrap: break-word;
+	}
+}

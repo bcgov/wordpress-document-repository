@@ -2,6 +2,7 @@ import {
 	Button,
 	CheckboxControl,
 	TextControl,
+	TextareaControl,
 	SelectControl,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
@@ -221,7 +222,11 @@ function DocumentTableRow( {
 	}
 	
 	return (
-		<div className="document-table-row" role="row">
+		<div
+			className="document-table-row"
+			role="row"
+			data-document-id={ document.id }
+		>
 			{ /* Selection checkbox cell */ }
 			<div
 				className="document-table-cell"
@@ -237,6 +242,46 @@ function DocumentTableRow( {
 			{ /* Document title cell */ }
 			<div className="document-table-cell" role="cell">
 				{ document.title || document.filename }
+			</div>
+
+			{ /* Excerpt cell */ }
+			<div className="document-table-cell" role="cell">
+				{ isSpreadsheetMode ? (
+					<TextareaControl
+						value={
+							typeof bulkEditedMetadata?.[ document.id ]
+								?.excerpt !== 'undefined'
+								? bulkEditedMetadata[ document.id ].excerpt
+								: document.excerpt || ''
+						}
+						onChange={ ( newValue ) => {
+							onMetadataChange(
+								document.id,
+								'excerpt',
+								newValue
+							);
+							// Auto-resize the textarea
+							setTimeout( () => {
+								const textarea = document.querySelector(
+									`[data-document-id="${ document.id }"] textarea`
+								);
+								if ( textarea ) {
+									textarea.style.height = 'auto';
+									textarea.style.height =
+										textarea.scrollHeight + 'px';
+								}
+							}, 0 );
+						} }
+						placeholder={ __(
+							'Enter excerpt…',
+							'bcgov-design-system'
+						) }
+						rows={ 2 }
+						className="excerpt-textarea"
+					/>
+				) : (
+					document.excerpt || '—'
+				) }
 			</div>
 
 			{ /* Metadata cells - dynamically rendered based on metadata fields */ }

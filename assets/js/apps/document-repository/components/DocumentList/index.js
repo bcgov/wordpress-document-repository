@@ -1,5 +1,10 @@
 import { useCallback, useMemo } from '@wordpress/element';
-import { Button, SelectControl, TextControl } from '@wordpress/components';
+import {
+	Button,
+	SelectControl,
+	TextControl,
+	TextareaControl,
+} from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import ErrorBoundary from './ErrorBoundary';
 import DocumentTable from './DocumentTable';
@@ -572,6 +577,39 @@ const DocumentList = ( {
 						saveButtonClassName="doc-repo-button save-button"
 					>
 						<div className="editable-metadata">
+							{ /* Excerpt field */ }
+							<div className="metadata-field">
+								<label htmlFor="excerpt">
+									{ __( 'Excerpt', 'bcgov-design-system' ) }
+								</label>
+								<TextareaControl
+									id="excerpt"
+									value={ editedValues.excerpt || '' }
+									onChange={ ( value ) => {
+										updateEditedField( 'excerpt', value );
+										// Auto-resize the textarea
+										setTimeout( () => {
+											const textarea =
+												document.getElementById(
+													'excerpt'
+												);
+											if ( textarea ) {
+												textarea.style.height = 'auto';
+												textarea.style.height =
+													textarea.scrollHeight +
+													'px';
+											}
+										}, 0 );
+									} }
+									placeholder={ __(
+										'Enter excerpt…',
+										'bcgov-design-system'
+									) }
+									rows={ 3 }
+									className="excerpt-textarea"
+								/>
+							</div>
+
 							{ metadataFields.map( ( field ) => (
 								<div
 									key={ field.id }

@@ -2,11 +2,43 @@
 @use "../abstracts/mixins" as mix;
 @use "sass:color";
 
+/* Excerpt textarea in table cells */
+.document-table-cell {
+
+	.excerpt-textarea {
+		min-height: 60px;
+		max-height: none; /* Remove max-height constraint */
+		resize: vertical;
+		transition: height 0.2s ease;
+		font-size: $font-size-sm;
+		line-height: 1.4;
+
+		&:focus {
+			min-height: 80px;
+		}
+
+		// Auto-resize functionality
+		&.components-textarea-control__input {
+			overflow: visible; /* Allow overflow */
+			word-wrap: break-word;
+			border: 1px solid $color-gray-300;
+			border-radius: $border-radius-sm;
+			padding: $spacing-xs $spacing-sm;
+
+			&:focus {
+				border-color: $color-primary;
+				box-shadow: 0 0 0 1px $color-primary;
+			}
+		}
+	}
+}
+
 .document-table {
 	width: 100%;
 	border-collapse: collapse;
 	margin-bottom: $spacing-lg;
 	background-color: $color-bg-lightest;
+	overflow: visible; /* Allow textarea overflow */
 
 	&__header {
 		background-color: $color-gray-100;
@@ -62,12 +94,50 @@
 				white-space: nowrap;
 			}
 		}
+
+		// Special handling for excerpt cells to prevent textarea cutoff
+		.document-table-cell {
+			position: relative;
+			overflow: visible;
+
+			&:has(.excerpt-textarea) {
+				overflow: visible;
+				position: relative;
+				z-index: 1;
+			}
+
+			.excerpt-textarea {
+				position: relative;
+				z-index: 10;
+
+				&.components-textarea-control__input {
+					// Ensure textarea can grow beyond cell boundaries
+					position: relative;
+					z-index: 20;
+
+					&:focus {
+						// When focused, allow overflow to show full content
+						overflow: visible;
+						z-index: 30;
+					}
+				}
+			}
+		}
 	}
 
 	&__body {
 
 		.document-table__row:last-child {
 			border-bottom: none;
+		}
+	}
+
+	&__footer {
+		background-color: $color-bg-lighter;
+		border-top: 1px solid $color-border;
+
+		td {
+			padding: $spacing-sm $spacing-md;
 		}
 	}
 
@@ -168,15 +238,6 @@
 		padding: $spacing-lg;
 		text-align: center;
 		color: $color-text-light;
-	}
-
-	&__footer {
-		background-color: $color-bg-lighter;
-		border-top: 1px solid $color-border;
-
-		td {
-			padding: $spacing-sm $spacing-md;
-		}
 	}
 
 	.document-cell {
@@ -316,15 +377,43 @@ button.components-button.doc-repo-button.spreadsheet-toggle {
 		background-color: rgba($color-error, 0.9);
 		color: $color-white;
 	}
+
+	&.save-button {
+
+		&:hover,
+		&:focus {
+			background-color: #069; /* Slightly darker than primary */
+			color: $color-white;
+		}
+	}
 }
 
-/* Ensure save button has good contrast on hover */
-.doc-repo-button.save-button {
+/* Additional fix for textarea resizing in table context */
+.components-textarea-control__input.excerpt-textarea {
+	// Ensure the textarea can overflow its container
+	position: relative;
+	z-index: 50;
+	max-height: none !important; /* Force remove any max-height */
+	overflow: visible !important; /* Force allow overflow */
 
-	&:hover,
 	&:focus {
-		background-color: #069; /* Slightly darker than primary */
-		color: $color-white;
+		// When focused, ensure it's above other elements
+		z-index: 100;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		max-height: none !important;
+		overflow: visible !important;
+	}
+
+	// When resizing, ensure it doesn't get cut off
+	&:active {
+		z-index: 100;
+		max-height: none !important;
+		overflow: visible !important;
+	}
+
+	// When being dragged/resized
+	&:hover {
+		z-index: 75;
 	}
 }
 

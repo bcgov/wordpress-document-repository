@@ -68,6 +68,13 @@ function DocumentTable( {
 					>
 						{ __( 'Title', 'bcgov-design-system' ) }
 					</div>
+					{ /* Excerpt column */ }
+					<div
+						className="document-table-cell header"
+						role="columnheader"
+					>
+						{ __( 'Excerpt', 'bcgov-design-system' ) }
+					</div>
 					{ /* Metadata columns */ }
 					{ metadataFields.map( ( field ) => (
 						<div
@@ -122,6 +129,7 @@ function DocumentTable( {
 							onMetadataChange={ onMetadataChange }
 							formatFileSize={ formatFileSize }
 							documentStatusFilter={ documentStatusFilter }
+							excerpt={ document.excerpt }
 						/>
 					</SafeRender>
 				) ) }
