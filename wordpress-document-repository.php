@@ -78,6 +78,10 @@ if ( is_admin() ) {
 // Override document search results.
 add_filter( 'post_type_link', 'wordpress_document_repository_override_permalink', 10, 2 );
 
+// Automatically publish documents when restored from trash.
+add_action( 'wp_insert_post', 'wordpress_document_repository_force_publish_after_untrash', 10, 3 );
+
+
 /**
  * Override document post permalink in search results with the direct file URL.
  *
@@ -93,4 +97,27 @@ function wordpress_document_repository_override_permalink( $post_link, $post ) {
 		}
 	}
 	return $post_link;
+}
+
+/**
+ * Force post status to 'publish' after untrashing.
+ *
+ * @param int     $post_ID Post ID.
+ * @param WP_Post $post    Post object.
+ * @param bool    $update  Whether this is an existing post being updated.
+ */
+function wordpress_document_repository_force_publish_after_untrash( $post_ID, $post, $update ) {
+	if ( 'document' === $post->post_type && $update ) {
+		// Check if this was just untrashed by looking at the post status.
+		$current_status = get_post_status( $post_ID );
+		if ( 'draft' === $current_status ) {
+			// Force it to publish.
+			wp_update_post(
+                array(
+					'ID'          => $post_ID,
+					'post_status' => 'publish',
+                )
+            );
+		}
+	}
 }
