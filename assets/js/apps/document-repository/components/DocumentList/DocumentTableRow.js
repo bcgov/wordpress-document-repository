@@ -5,6 +5,7 @@ import {
 	SelectControl,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
+import { isTrashView } from '../../utils/documentStatus';
 
 /**
  * DocumentTableRow Component
@@ -12,18 +13,20 @@ import { __, sprintf } from '@wordpress/i18n';
  * A row component that displays a single document's information and actions.
  * Handles both display and editing of document metadata in spreadsheet mode.
  *
- * @param {Object}   props                    - Component props
- * @param {Object}   props.document           - The document object containing all document data
- * @param {boolean}  props.isSelected         - Whether this document is currently selected
- * @param {Function} props.onSelect           - Callback when the document's selection state changes
- * @param {Function} props.onDelete           - Callback when the document is deleted
- * @param {Function} props.onEdit             - Callback when the document is edited
- * @param {boolean}  props.isDeleting         - Flag indicating if a delete operation is in progress
- * @param {Array}    props.metadataFields     - Array of metadata field definitions
- * @param {boolean}  props.isSpreadsheetMode  - Flag indicating if table is in spreadsheet mode
- * @param {Object}   props.bulkEditedMetadata - Object containing bulk edited metadata values
- * @param {Function} props.onMetadataChange   - Callback when metadata is changed in spreadsheet mode
- * @param {Function} props.formatFileSize     - Function to format file size for display
+ * @param {Object}   props                      - Component props
+ * @param {Object}   props.document             - The document object containing all document data
+ * @param {boolean}  props.isSelected           - Whether this document is currently selected
+ * @param {Function} props.onSelect             - Callback when the document's selection state changes
+ * @param {Function} props.onDelete             - Callback when the document is deleted
+ * @param {Function} props.onRestore            - Callback when the document is restored from trash
+ * @param {Function} props.onEdit               - Callback when the document is edited
+ * @param {boolean}  props.isDeleting           - Flag indicating if a delete operation is in progress
+ * @param {Array}    props.metadataFields       - Array of metadata field definitions
+ * @param {boolean}  props.isSpreadsheetMode    - Flag indicating if table is in spreadsheet mode
+ * @param {Object}   props.bulkEditedMetadata   - Object containing bulk edited metadata values
+ * @param {Function} props.onMetadataChange     - Callback when metadata is changed in spreadsheet mode
+ * @param {Function} props.formatFileSize       - Function to format file size for display
+ * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
  * @return {JSX.Element} Rendered document table row
  */
 function DocumentTableRow( {
@@ -32,12 +35,14 @@ function DocumentTableRow( {
 	onSelect,
 	onDelete,
 	onEdit,
+	onRestore,
 	isDeleting,
 	metadataFields,
 	isSpreadsheetMode,
 	bulkEditedMetadata,
 	onMetadataChange,
 	formatFileSize,
+	documentStatusFilter,
 } ) {
 	const renderMetadataField = ( field ) => {
 		if ( ! isSpreadsheetMode ) {
@@ -106,6 +111,115 @@ function DocumentTableRow( {
 		);
 	};
 
+	/**
+	 * Render the action buttons contextually.
+	 * If viewing trashed documents, show the restore and delete permanently buttons
+	 * If viewing other documents, show the download, edit and trash buttons
+	 */
+	const renderActions = () => {
+		if ( isTrashView( documentStatusFilter ) ) {
+			return (
+				<>
+				{ /* Restore button */ }
+				<Button
+					onClick={ () => onRestore( document ) }
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Restore', 'bcgov-design-system' ) }
+					aria-label={ __( 'Restore', 'bcgov-design-system' ) }
+					disabled={ isDeleting }
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16px" height="16px" >
+						<path
+							d="M440-320h80v-166l64 62 56-56-160-160-160 160 56 56 64-62v166ZM280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
+							fill="currentColor"
+						/>
+					</svg>
+
+				</Button>
+
+				{ /* Delete Permanently button */ }
+				<Button
+					onClick={ () => onDelete( document ) }
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Delete Permanently', 'bcgov-design-system' ) }
+					aria-label={ __( 'Delete Permanently', 'bcgov-design-system' ) }
+					disabled={ isDeleting }
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16px" height="16px">
+						<path
+						d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
+						fill="currentColor"
+						/>
+					</svg>
+					
+				</Button>
+				</>
+			);
+		} else return (
+			<>
+				{ /* Download button */ }
+				<Button
+					onClick={ () =>
+						window.open(
+							document.metadata.document_file_url,
+							'_blank'
+						)
+					}
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Download', 'bcgov-design-system' ) }
+					aria-label={ __(
+						'Download',
+						'bcgov-design-system'
+					) }
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path
+							d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+							fill="currentColor"
+						/>
+					</svg>
+				</Button>
+
+				{ /* Edit button */ }
+				<Button
+					onClick={ () => onEdit( document ) }
+					className="doc-repo-button icon-button table-action-button"
+					title={ __(
+						'Edit Metadata',
+						'bcgov-design-system'
+					) }
+					aria-label={ __(
+						'Edit Metadata',
+						'bcgov-design-system'
+					) }
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path
+							d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+							fill="currentColor"
+						/>
+					</svg>
+				</Button>
+
+				{ /* Trash button */ }
+				<Button
+					onClick={ () => onDelete( document ) }
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Trash', 'bcgov-design-system' ) }
+					aria-label={ __( 'Trash', 'bcgov-design-system' ) }
+					disabled={ isDeleting }
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path
+							d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+							fill="currentColor"
+						/>
+					</svg>
+				</Button>
+			</>
+		);
+	}
+	
 	return (
 		<div className="document-table-row" role="row">
 			{ /* Selection checkbox cell */ }
@@ -163,65 +277,7 @@ function DocumentTableRow( {
 			>
 				{ ! isSpreadsheetMode && (
 					<div className="action-buttons">
-						{ /* Download button */ }
-						<Button
-							onClick={ () =>
-								window.open(
-									document.metadata.document_file_url,
-									'_blank'
-								)
-							}
-							className="doc-repo-button icon-button table-action-button"
-							title={ __( 'Download', 'bcgov-design-system' ) }
-							aria-label={ __(
-								'Download',
-								'bcgov-design-system'
-							) }
-						>
-							<svg viewBox="0 0 24 24" width="16" height="16">
-								<path
-									d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
-									fill="currentColor"
-								/>
-							</svg>
-						</Button>
-
-						{ /* Edit button */ }
-						<Button
-							onClick={ () => onEdit( document ) }
-							className="doc-repo-button icon-button table-action-button"
-							title={ __(
-								'Edit Metadata',
-								'bcgov-design-system'
-							) }
-							aria-label={ __(
-								'Edit Metadata',
-								'bcgov-design-system'
-							) }
-						>
-							<svg viewBox="0 0 24 24" width="16" height="16">
-								<path
-									d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-									fill="currentColor"
-								/>
-							</svg>
-						</Button>
-
-						{ /* Delete button */ }
-						<Button
-							onClick={ () => onDelete( document ) }
-							className="doc-repo-button icon-button table-action-button"
-							title={ __( 'Delete', 'bcgov-design-system' ) }
-							aria-label={ __( 'Delete', 'bcgov-design-system' ) }
-							disabled={ isDeleting }
-						>
-							<svg viewBox="0 0 24 24" width="16" height="16">
-								<path
-									d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-									fill="currentColor"
-								/>
-							</svg>
-						</Button>
+						{ renderActions() }
 					</div>
 				) }
 			</div>

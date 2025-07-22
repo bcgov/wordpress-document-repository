@@ -277,6 +277,7 @@ class DocumentPostType {
 				'post_type'      => $this->config->get_post_type(),
 				'fields'         => 'ids',
 				'posts_per_page' => -1,
+                'post_status'    => [ 'publish', 'draft', 'pending', 'private', 'trash' ],
 			]
         );
 
