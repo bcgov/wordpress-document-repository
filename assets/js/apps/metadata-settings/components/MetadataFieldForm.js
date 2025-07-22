@@ -109,6 +109,16 @@ const MetadataFieldForm = ( {
 					) }
 				/>
 			) }
+
+			<TextareaControl
+				label={ __( 'Field Description', 'bcgov-design-system' ) }
+				value={ field.description }
+				onChange={ ( description ) => onChange( 'description', description ) }
+				help={ __(
+					'Description for the field',
+					'bcgov-design-system'
+				) }
+			/>
 		</div>
 	);
 };

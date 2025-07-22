@@ -98,22 +98,13 @@ const MetadataApp = () => {
 
 					// Check for changes
 					let hasFieldChanges = false;
+					const fieldsToCompare = [ 'label', 'type', 'description', '_rawOptionsText' ];
 					if ( originalValues ) {
-						// Compare label
-						if ( originalValues.label !== updatedField.label ) {
-							hasFieldChanges = true;
-						}
-						// Compare type
-						else if ( originalValues.type !== updatedField.type ) {
-							hasFieldChanges = true;
-						}
-						// Compare options
-						else if (
-							originalValues._rawOptionsText !==
-							updatedField._rawOptionsText
-						) {
-							hasFieldChanges = true;
-						}
+						hasFieldChanges = fieldsToCompare.some(
+							( key ) =>
+								( originalValues[ key ] || '' ) !==
+								( updatedField[ key ] || '' )
+						);
 					}
 
 					setHasChanges( hasFieldChanges );
@@ -292,6 +283,7 @@ const MetadataApp = () => {
 			const originalFieldValues = {
 				label: field.label || '',
 				type: field.type || '',
+				description: field.description || '',
 				options: normalizeOptions( field.options ),
 				_rawOptionsText:
 					field._rawOptionsText || formatOptionsToString( field ),
