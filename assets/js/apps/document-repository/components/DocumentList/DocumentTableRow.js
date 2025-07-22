@@ -121,42 +121,57 @@ function DocumentTableRow( {
 		if ( isTrashView( documentStatusFilter ) ) {
 			return (
 				<>
-				{ /* Restore button */ }
-				<Button
-					onClick={ () => onRestore( document ) }
-					className="doc-repo-button icon-button table-action-button"
-					title={ __( 'Restore', 'bcgov-design-system' ) }
-					aria-label={ __( 'Restore', 'bcgov-design-system' ) }
-					disabled={ isDeleting }
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16px" height="16px" >
-						<path
-							d="M440-320h80v-166l64 62 56-56-160-160-160 160 56 56 64-62v166ZM280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
-							fill="currentColor"
-						/>
-					</svg>
+					{ /* Restore button */ }
+					<Button
+						onClick={ () => onRestore( document ) }
+						className="doc-repo-button icon-button table-action-button"
+						title={ __( 'Restore', 'bcgov-design-system' ) }
+						aria-label={ __( 'Restore', 'bcgov-design-system' ) }
+						disabled={ isDeleting }
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 -960 960 960"
+							width="16px"
+							height="16px"
+						>
+							<path
+								d="M440-320h80v-166l64 62 56-56-160-160-160 160 56 56 64-62v166ZM280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
+								fill="currentColor"
+							/>
+						</svg>
+					</Button>
 
-				</Button>
-
-				{ /* Delete Permanently button */ }
-				<Button
-					onClick={ () => onDelete( document ) }
-					className="doc-repo-button icon-button table-action-button"
-					title={ __( 'Delete Permanently', 'bcgov-design-system' ) }
-					aria-label={ __( 'Delete Permanently', 'bcgov-design-system' ) }
-					disabled={ isDeleting }
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16px" height="16px">
-						<path
-						d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
-						fill="currentColor"
-						/>
-					</svg>
-					
-				</Button>
+					{ /* Delete Permanently button */ }
+					<Button
+						onClick={ () => onDelete( document ) }
+						className="doc-repo-button icon-button table-action-button"
+						title={ __(
+							'Delete Permanently',
+							'bcgov-design-system'
+						) }
+						aria-label={ __(
+							'Delete Permanently',
+							'bcgov-design-system'
+						) }
+						disabled={ isDeleting }
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 -960 960 960"
+							width="16px"
+							height="16px"
+						>
+							<path
+								d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
+								fill="currentColor"
+							/>
+						</svg>
+					</Button>
 				</>
 			);
-		} else return (
+		}
+		return (
 			<>
 				{ /* Download button */ }
 				<Button
@@ -168,10 +183,7 @@ function DocumentTableRow( {
 					}
 					className="doc-repo-button icon-button table-action-button"
 					title={ __( 'Download', 'bcgov-design-system' ) }
-					aria-label={ __(
-						'Download',
-						'bcgov-design-system'
-					) }
+					aria-label={ __( 'Download', 'bcgov-design-system' ) }
 				>
 					<svg viewBox="0 0 24 24" width="16" height="16">
 						<path
@@ -185,14 +197,8 @@ function DocumentTableRow( {
 				<Button
 					onClick={ () => onEdit( document ) }
 					className="doc-repo-button icon-button table-action-button"
-					title={ __(
-						'Edit Metadata',
-						'bcgov-design-system'
-					) }
-					aria-label={ __(
-						'Edit Metadata',
-						'bcgov-design-system'
-					) }
+					title={ __( 'Edit Metadata', 'bcgov-design-system' ) }
+					aria-label={ __( 'Edit Metadata', 'bcgov-design-system' ) }
 				>
 					<svg viewBox="0 0 24 24" width="16" height="16">
 						<path
@@ -219,8 +225,8 @@ function DocumentTableRow( {
 				</Button>
 			</>
 		);
-	}
-	
+	};
+
 	return (
 		<div
 			className="document-table-row"
@@ -321,9 +327,7 @@ function DocumentTableRow( {
 				aria-label={ __( 'Document actions', 'bcgov-design-system' ) }
 			>
 				{ ! isSpreadsheetMode && (
-					<div className="action-buttons">
-						{ renderActions() }
-					</div>
+					<div className="action-buttons">{ renderActions() }</div>
 				) }
 			</div>
 		</div>

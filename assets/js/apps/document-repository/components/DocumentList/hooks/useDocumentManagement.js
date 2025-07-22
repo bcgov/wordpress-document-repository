@@ -26,8 +26,10 @@ const useDocumentManagement = ( {
 } ) => {
 	const [ deleteDocument, setDeleteDocument ] = useState( null );
 	const [ restoreDocument, setRestoreDocument ] = useState( null );
-	const [ bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen ] = useState( false );
-	const [ bulkRestoreConfirmOpen, setBulkRestoreConfirmOpen ] = useState( false );
+	const [ bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen ] =
+		useState( false );
+	const [ bulkRestoreConfirmOpen, setBulkRestoreConfirmOpen ] =
+		useState( false );
 	const [ isMultiDeleting, setIsMultiDeleting ] = useState( false );
 	const [ isMultiRestoring, setIsMultiRestoring ] = useState( false );
 
@@ -45,43 +47,56 @@ const useDocumentManagement = ( {
 
 			try {
 				await Promise.all(
-                    selectedDocuments.map( ( docId ) =>
-                        isTrashView( documentStatusFilter )
-                            ? onDelete( docId )
-                            : onTrash( docId )
-                    )
-                );
+					selectedDocuments.map( ( docId ) =>
+						isTrashView( documentStatusFilter )
+							? onDelete( docId )
+							: onTrash( docId )
+					)
+				);
 				setBulkDeleteConfirmOpen( false );
 				onSelectAll( false );
 
 				if ( onShowNotification ) {
-                    onShowNotification(
-                        'success',
-                        __(
-                            isTrashView( documentStatusFilter )
-                                ? 'Selected documents were deleted successfully.'
-                                : 'Selected documents were trashed successfully.',
-                            'bcgov-design-system'
-                        )
-                    );
-                }
+					onShowNotification(
+						'success',
+						isTrashView( documentStatusFilter )
+							? __(
+									'Selected documents were deleted successfully.',
+									'bcgov-design-system'
+							  )
+							: __(
+									'Selected documents were trashed successfully.',
+									'bcgov-design-system'
+							  )
+					);
+				}
 			} catch ( error ) {
-                if ( onError ) {
-                    onError( 'bulk-delete', null, error, {
-                        addToRetryQueue: false,
-                        customMessage: __(
-                            isTrashView( documentStatusFilter )
-                                ? 'Error deleting one or more documents.'
-                                : 'Error trashing one or more documents.',
-                            'bcgov-design-system'
-                        ),
-                    } );
-                }
-            } finally {
+				if ( onError ) {
+					onError( 'bulk-delete', null, error, {
+						addToRetryQueue: false,
+						customMessage: isTrashView( documentStatusFilter )
+							? __(
+									'Error deleting one or more documents.',
+									'bcgov-design-system'
+							  )
+							: __(
+									'Error trashing one or more documents.',
+									'bcgov-design-system'
+							  ),
+					} );
+				}
+			} finally {
 				setIsMultiDeleting( false );
 			}
 		},
-		[ onDelete, onTrash, documentStatusFilter, onSelectAll, onShowNotification, onError ]
+		[
+			onDelete,
+			onTrash,
+			documentStatusFilter,
+			onSelectAll,
+			onShowNotification,
+			onError,
+		]
 	);
 
 	/**
@@ -92,41 +107,56 @@ const useDocumentManagement = ( {
 		async ( documentId ) => {
 			try {
 				if ( isTrashView( documentStatusFilter ) ) {
-                    await onDelete( documentId );
-                } else {
-                    await onTrash( documentId );
-                }
+					await onDelete( documentId );
+				} else {
+					await onTrash( documentId );
+				}
 				setDeleteDocument( null );
 
 				if ( onShowNotification ) {
-                    onShowNotification(
-                        'success',
-                        __(
-                            isTrashView( documentStatusFilter )
-                                ? 'Document deleted successfully.'
-                                : 'Document trashed successfully.',
-                            'bcgov-design-system'
-                        )
-                    );
-                }
+					onShowNotification(
+						'success',
+						isTrashView( documentStatusFilter )
+							? __(
+									'Document deleted successfully.',
+									'bcgov-design-system'
+							  )
+							: __(
+									'Document trashed successfully.',
+									'bcgov-design-system'
+							  )
+					);
+				}
 			} catch ( error ) {
 				if ( onError ) {
 					onError( 'delete', documentId, error, {
-						customMessage: sprintf(
-							/* translators: %1$d: document ID, %2$s: error message */
-							__(
-                                isTrashView( documentStatusFilter )
-                                    ? 'Error deleting document %1$d: %2$s'
-                                    : 'Error trashing document %1$d: %2$s',
-                                'bcgov-design-system'
-                            ),
-							documentId,
-							error.message ||
-								__(
-									'An unknown error occurred',
-									'bcgov-design-system'
-								)
-						),
+						customMessage: isTrashView( documentStatusFilter )
+							? sprintf(
+									/* translators: %1$d: document ID, %2$s: error message */
+									__(
+										'Error deleting document %1$d: %2$s',
+										'bcgov-design-system'
+									),
+									documentId,
+									error.message ||
+										__(
+											'An unknown error occurred',
+											'bcgov-design-system'
+										)
+							  )
+							: sprintf(
+									/* translators: %1$d: document ID, %2$s: error message */
+									__(
+										'Error trashing document %1$d: %2$s',
+										'bcgov-design-system'
+									),
+									documentId,
+									error.message ||
+										__(
+											'An unknown error occurred',
+											'bcgov-design-system'
+										)
+							  ),
 					} );
 				}
 			}
@@ -185,24 +215,28 @@ const useDocumentManagement = ( {
 	const handleSingleRestore = useCallback(
 		async ( documentId ) => {
 			try {
-				
-
 				await onRestore( documentId );
 
 				setRestoreDocument( null );
 
 				if ( onShowNotification ) {
-                    onShowNotification(
-                        'success',
-                        __( 'Document restored successfully.', 'bcgov-design-system' )
-                    );
-                }
+					onShowNotification(
+						'success',
+						__(
+							'Document restored successfully.',
+							'bcgov-design-system'
+						)
+					);
+				}
 			} catch ( error ) {
 				if ( onError ) {
 					onError( 'restore', documentId, error, {
 						customMessage: sprintf(
 							/* translators: %1$d: document ID, %2$s: error message */
-							__( 'Error restoring document %1$d: %2$s', 'bcgov-design-system' ),
+							__(
+								'Error restoring document %1$d: %2$s',
+								'bcgov-design-system'
+							),
 							documentId,
 							error.message ||
 								__(

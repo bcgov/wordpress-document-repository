@@ -240,8 +240,8 @@ export const useDocuments = () => {
 
 			// WordPress native restore endpoint
 			await apiFetch( {
-			path: `/${ apiNamespace }/documents/${ documentId }/restore`,
-			method: 'POST',
+				path: `/${ apiNamespace }/documents/${ documentId }/restore`,
+				method: 'POST',
 			} );
 
 			await fetchDocuments();
