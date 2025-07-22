@@ -98,7 +98,12 @@ const MetadataApp = () => {
 
 					// Check for changes
 					let hasFieldChanges = false;
-					const fieldsToCompare = [ 'label', 'type', 'description', '_rawOptionsText' ];
+					const fieldsToCompare = [
+						'label',
+						'type',
+						'description',
+						'_rawOptionsText',
+					];
 					if ( originalValues ) {
 						hasFieldChanges = fieldsToCompare.some(
 							( key ) =>

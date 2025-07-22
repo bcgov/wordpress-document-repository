@@ -63,7 +63,6 @@ const App = () => {
 		setSearchParams,
 	} = useDocuments();
 
-
 	// Initialize data on component mount
 	useEffect( () => {
 		const initializeData = async () => {
@@ -165,12 +164,14 @@ const App = () => {
 	useEffect( () => {
 		setSearchParams( ( prev ) => ( {
 			...prev,
-			status: isAllView( documentStatusFilter ) ? undefined : documentStatusFilter,
+			status: isAllView( documentStatusFilter )
+				? undefined
+				: documentStatusFilter,
 			page: 1,
-		}));
+		} ) );
 
 		setSelectedDocuments( [] );
-	}, [ documentStatusFilter ] );
+	}, [ documentStatusFilter, setSearchParams ] );
 
 	/**
 	 * Handle document selection for bulk actions
@@ -454,7 +455,7 @@ const App = () => {
 					onFileDrop={ handleFileDrop }
 					statusCounts={ statusCounts }
 					documentStatusFilter={ documentStatusFilter }
-  					onStatusFilterChange={setDocumentStatusFilter}
+					onStatusFilterChange={ setDocumentStatusFilter }
 				/>
 
 				{ /* Upload Modal */ }

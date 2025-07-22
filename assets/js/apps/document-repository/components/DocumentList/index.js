@@ -1,5 +1,10 @@
 import { useCallback, useMemo } from '@wordpress/element';
-import { Button, SelectControl, TextControl } from '@wordpress/components';
+import {
+	Button,
+	SelectControl,
+	TextControl,
+	TextareaControl,
+} from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import ErrorBoundary from './ErrorBoundary';
 import DocumentTable from './DocumentTable';
@@ -38,7 +43,7 @@ import useDocumentManagement from './hooks/useDocumentManagement';
  * @param {Function} props.onFileDrop           - Callback when files are dropped/uploaded
  * @param {Function} props.onDocumentsUpdate    - Callback when documents are updated
  * @param {Array}    props.metadataFields       - Array of metadata field definitions
- * @param {Array} 	 props.statusCounts 	    - Array of number of documents of each status
+ * @param {Array}    props.statusCounts         - Array of number of documents of each status
  * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
  * @param {Function} props.onStatusFilterChange - Callback when filter changes
  */
@@ -59,7 +64,7 @@ const DocumentList = ( {
 	metadataFields = [],
 	statusCounts = {},
 	documentStatusFilter = 'all',
-  	onStatusFilterChange,
+	onStatusFilterChange,
 } ) => {
 	// Memoize formatFileSize function
 	const formatFileSize = useMemo(
@@ -208,6 +213,7 @@ const DocumentList = ( {
 			formatFileSize,
 			setDeleteDocument,
 			setRestoreDocument,
+			documentStatusFilter,
 		]
 	);
 
@@ -215,15 +221,41 @@ const DocumentList = ( {
 		handleFiles( files );
 	};
 
+	// Helper functions to avoid nested ternary expressions
+	const getSingleDeleteButtonText = () => {
+		if ( isDeleting ) {
+			return isTrashView( documentStatusFilter )
+				? __( 'Deleting…', 'bcgov-design-system' )
+				: __( 'Trashing…', 'bcgov-design-system' );
+		}
+		return isTrashView( documentStatusFilter )
+			? __( 'Delete Permanently', 'bcgov-design-system' )
+			: __( 'Trash', 'bcgov-design-system' );
+	};
+
+	const getBulkDeleteButtonText = () => {
+		if ( isMultiDeleting ) {
+			return isTrashView( documentStatusFilter )
+				? __( 'Deleting…', 'bcgov-design-system' )
+				: __( 'Trashing…', 'bcgov-design-system' );
+		}
+		return isTrashView( documentStatusFilter )
+			? __( 'Delete Selected Permanently', 'bcgov-design-system' )
+			: __( 'Trash Selected', 'bcgov-design-system' );
+	};
+
 	// Counts of all untrashed and trashed documents
 	const { totalDocumentCount, trashedCount } = useMemo( () => {
 		// Count all statuses except 'trash'
-		const total = Object.entries( statusCounts ).reduce( ( acc, [ key, val ] ) => {
-			if ( key !== 'trash' ) {
-			return acc + Number( val || 0 );
-			}
-			return acc;
-		}, 0);
+		const total = Object.entries( statusCounts ).reduce(
+			( acc, [ key, val ] ) => {
+				if ( key !== 'trash' ) {
+					return acc + Number( val || 0 );
+				}
+				return acc;
+			},
+			0
+		);
 
 		// Trash count
 		const trash = Number( statusCounts.trash || 0 );
@@ -253,29 +285,43 @@ const DocumentList = ( {
 
 				<ul className="subsubsub document-status-filters">
 					<li className="all">
-						<a
-						href="#"
-						className={ isAllView( documentStatusFilter ) ? 'current' : '' }
-						onClick={ ( e ) => {
-							e.preventDefault();
-							onStatusFilterChange && onStatusFilterChange( 'all' );
-						} }
+						<button
+							type="button"
+							className={
+								isAllView( documentStatusFilter )
+									? 'current'
+									: ''
+							}
+							onClick={ () => {
+								if ( onStatusFilterChange ) {
+									onStatusFilterChange( 'all' );
+								}
+							} }
 						>
-						{ __( 'All', 'bcgov-design-system' ) } <span className="count">( { totalDocumentCount } )</span>
-						</a>
+							{ __( 'All', 'bcgov-design-system' ) }{ ' ' }
+							<span className="count">
+								( { totalDocumentCount } )
+							</span>
+						</button>
 					</li>
 					<li className="trash">
-						{ ' | ' }
-						<a
-						href="#"
-						className={ isTrashView( documentStatusFilter ) ? 'current' : '' }
-						onClick={ ( e ) => {
-							e.preventDefault();
-							onStatusFilterChange && onStatusFilterChange( 'trash' );
-						} }
+						<span className="separator"> | </span>
+						<button
+							type="button"
+							className={
+								isTrashView( documentStatusFilter )
+									? 'current'
+									: ''
+							}
+							onClick={ () => {
+								if ( onStatusFilterChange ) {
+									onStatusFilterChange( 'trash' );
+								}
+							} }
 						>
-						{ __( 'Trash', 'bcgov-design-system ' ) } <span className="count">( { trashedCount } )</span>
-						</a>
+							{ __( 'Trash', 'bcgov-design-system' ) }{ ' ' }
+							<span className="count">( { trashedCount } )</span>
+						</button>
 					</li>
 				</ul>
 
@@ -317,36 +363,47 @@ const DocumentList = ( {
 							</Button>
 						) }
 
-						{ isTrashView( documentStatusFilter ) && selectedDocuments.length > 0 && (
-							<Button
-								className="doc-repo-button save-button bulk-restore-button"
-								onClick={ openBulkRestoreConfirm }
-								disabled={ isMultiRestoring }
-							>
-								{ sprintf(
-								/* translators: %d: number of selected documents */
-								__( 'Restore Selected (%d)', 'bcgov-design-system' ),
-								selectedDocuments.length
-								) }
-							</Button>
+						{ isTrashView( documentStatusFilter ) &&
+							selectedDocuments.length > 0 && (
+								<Button
+									className="doc-repo-button save-button bulk-restore-button"
+									onClick={ openBulkRestoreConfirm }
+									disabled={ isMultiRestoring }
+								>
+									{ sprintf(
+										/* translators: %d: number of selected documents */
+										__(
+											'Restore Selected (%d)',
+											'bcgov-design-system'
+										),
+										selectedDocuments.length
+									) }
+								</Button>
 							) }
-	
+
 						{ selectedDocuments.length > 0 && (
 							<Button
 								className="doc-repo-button delete-button bulk-delete-button"
 								onClick={ openBulkDeleteConfirm }
 								disabled={ isMultiDeleting }
 							>
-								{ sprintf(
-								/* translators: %d: number of selected documents */
-								__(
-									isTrashView( documentStatusFilter )
-									? 'Delete Selected Permanently (%d)'
-									: 'Trash Selected (%d)',
-									'bcgov-design-system'
-								),
-								selectedDocuments.length
-								) }
+								{ isTrashView( documentStatusFilter )
+									? sprintf(
+											/* translators: %d: number of selected documents */
+											__(
+												'Delete Selected Permanently (%d)',
+												'bcgov-design-system'
+											),
+											selectedDocuments.length
+									  )
+									: sprintf(
+											/* translators: %d: number of selected documents */
+											__(
+												'Trash Selected (%d)',
+												'bcgov-design-system'
+											),
+											selectedDocuments.length
+									  ) }
 							</Button>
 						) }
 					</div>
@@ -372,7 +429,10 @@ const DocumentList = ( {
 					<MetadataModal
 						title={
 							isTrashView( documentStatusFilter )
-								? __( 'Delete Document Permanently', 'bcgov-design-system' )
+								? __(
+										'Delete Document Permanently',
+										'bcgov-design-system'
+								  )
 								: __( 'Trash Document', 'bcgov-design-system' )
 						}
 						isOpen={ !! deleteDocument }
@@ -380,40 +440,32 @@ const DocumentList = ( {
 						onSave={ () => handleSingleDelete( deleteDocument.id ) }
 						isSaving={ isDeleting }
 						isDisabled={ false }
-						saveButtonText={
-							isDeleting
-								? __(
-									isTrashView( documentStatusFilter )
-										? 'Deleting…'
-										: 'Trashing…',
-									'bcgov-design-system'
-								)
-								: __(
-									isTrashView( documentStatusFilter )
-										? 'Delete Permanently'
-										: 'Trash',
-									'bcgov-design-system'
-								)
-						}
+						saveButtonText={ getSingleDeleteButtonText() }
 						saveButtonClassName="doc-repo-button delete-button"
 					>
 						<div className="delete-confirmation-content">
 							<div className="delete-warning">
-								{ __(
-									isTrashView( documentStatusFilter )
-										? 'Are you sure you want to delete this document? This action cannot be undone.'
-										: 'Are you sure you want to trash this document?',
-									'bcgov-design-system'
-								) }
+								{ isTrashView( documentStatusFilter )
+									? __(
+											'Are you sure you want to delete this document? This action cannot be undone.',
+											'bcgov-design-system'
+									  )
+									: __(
+											'Are you sure you want to trash this document?',
+											'bcgov-design-system'
+									  ) }
 							</div>
 							<div className="documents-to-delete">
 								<h4>
-									{ __(
-										isTrashView( documentStatusFilter )
-											? 'Document to be deleted:'
-											: 'Document to be trashed:',
-										'bcgov-design-system'
-									) }
+									{ isTrashView( documentStatusFilter )
+										? __(
+												'Document to be deleted:',
+												'bcgov-design-system'
+										  )
+										: __(
+												'Document to be trashed:',
+												'bcgov-design-system'
+										  ) }
 								</h4>
 								<ul>
 									<li>{ deleteDocument.title }</li>
@@ -425,21 +477,37 @@ const DocumentList = ( {
 
 				{ restoreDocument && (
 					<MetadataModal
-						title={ __( 'Restore Document', 'bcgov-design-system' ) }
-						isOpen={ !!restoreDocument }
+						title={ __(
+							'Restore Document',
+							'bcgov-design-system'
+						) }
+						isOpen={ !! restoreDocument }
 						onClose={ () => setRestoreDocument( null ) }
-						onSave={ () => handleSingleRestore( restoreDocument.id ) }
+						onSave={ () =>
+							handleSingleRestore( restoreDocument.id )
+						}
 						isSaving={ isDeleting }
 						isDisabled={ false }
-						saveButtonText={ __( 'Restore', 'bcgov-design-system' ) }
+						saveButtonText={ __(
+							'Restore',
+							'bcgov-design-system'
+						) }
 						saveButtonClassName="doc-repo-button save-button"
 					>
 						<div className="restore-confirmation-content">
 							<div className="restore-warning">
-								{ __( 'Are you sure you want to restore this document?', 'bcgov-design-system' ) }
+								{ __(
+									'Are you sure you want to restore this document?',
+									'bcgov-design-system'
+								) }
 							</div>
 							<div className="documents-to-restore">
-								<h4>{ __( 'Document to be restored:', 'bcgov-design-system' ) }</h4>
+								<h4>
+									{ __(
+										'Document to be restored:',
+										'bcgov-design-system'
+									) }
+								</h4>
 								<ul>
 									<li>{ restoreDocument.title }</li>
 								</ul>
@@ -453,48 +521,54 @@ const DocumentList = ( {
 					<MetadataModal
 						title={
 							isTrashView( documentStatusFilter )
-								? __( 'Delete Selected Documents Permanently', 'bcgov-design-system' )
-								: __( 'Trash Selected Documents', 'bcgov-design-system' )
+								? __(
+										'Delete Selected Documents Permanently',
+										'bcgov-design-system'
+								  )
+								: __(
+										'Trash Selected Documents',
+										'bcgov-design-system'
+								  )
 						}
 						isOpen={ bulkDeleteConfirmOpen }
 						onClose={ closeBulkDeleteConfirm }
 						onSave={ () => handleBulkDelete( selectedDocuments ) }
 						isSaving={ isMultiDeleting }
 						isDisabled={ false }
-						saveButtonText={
-							isMultiDeleting
-								? __(
-									isTrashView( documentStatusFilter )
-										? 'Deleting…'
-										: 'Trashing…',
-									'bcgov-design-system'
-								)
-								: __(
-									isTrashView( documentStatusFilter )
-										? 'Delete Selected Permanently'
-										: 'Trash Selected',
-									'bcgov-design-system'
-								)
-						}
+						saveButtonText={ getBulkDeleteButtonText() }
 						saveButtonClassName="doc-repo-button delete-button"
 					>
 						<div className="delete-confirmation-content">
 							<div className="delete-warning">
-								{ __(
-									isTrashView( documentStatusFilter )
-										? 'Are you sure you want to delete the selected documents? This action cannot be undone.'
-										: 'Are you sure you want to trash the selected documents?',
-									'bcgov-design-system'
-								) }
+								{ isTrashView( documentStatusFilter )
+									? __(
+											'Are you sure you want to delete the selected documents? This action cannot be undone.',
+											'bcgov-design-system'
+									  )
+									: __(
+											'Are you sure you want to trash the selected documents?',
+											'bcgov-design-system'
+									  ) }
 							</div>
 							<div className="documents-to-delete">
 								<h4>
-									{ sprintf(
-										isTrashView( documentStatusFilter )
-											? __( 'Documents to be deleted (%d):', 'bcgov-design-system' )
-											: __( 'Documents to be trashed (%d):', 'bcgov-design-system' ),
-										selectedDocuments.length
-									) }
+									{ isTrashView( documentStatusFilter )
+										? sprintf(
+												/* translators: %d: number of selected documents */
+												__(
+													'Documents to be deleted (%d):',
+													'bcgov-design-system'
+												),
+												selectedDocuments.length
+										  )
+										: sprintf(
+												/* translators: %d: number of selected documents */
+												__(
+													'Documents to be trashed (%d):',
+													'bcgov-design-system'
+												),
+												selectedDocuments.length
+										  ) }
 								</h4>
 								<ul>
 									{ localDocuments
@@ -514,7 +588,10 @@ const DocumentList = ( {
 
 				{ bulkRestoreConfirmOpen && (
 					<MetadataModal
-						title={ __( 'Restore Selected Documents', 'bcgov-design-system' ) }
+						title={ __(
+							'Restore Selected Documents',
+							'bcgov-design-system'
+						) }
 						isOpen={ bulkRestoreConfirmOpen }
 						onClose={ closeBulkRestoreConfirm }
 						onSave={ () => handleBulkRestore( selectedDocuments ) }
@@ -523,7 +600,10 @@ const DocumentList = ( {
 						saveButtonText={
 							isMultiRestoring
 								? __( 'Restoring…', 'bcgov-design-system' )
-								: __( 'Restore Selected', 'bcgov-design-system' )
+								: __(
+										'Restore Selected',
+										'bcgov-design-system'
+								  )
 						}
 						saveButtonClassName="doc-repo-button save-button"
 					>
@@ -537,15 +617,23 @@ const DocumentList = ( {
 							<div className="documents-to-restore">
 								<h4>
 									{ sprintf(
-										__( 'Documents to be restored (%d):', 'bcgov-design-system' ),
+										/* translators: %d: number of selected documents */
+										__(
+											'Documents to be restored (%d):',
+											'bcgov-design-system'
+										),
 										selectedDocuments.length
 									) }
 								</h4>
 								<ul>
 									{ localDocuments
-										.filter( ( doc ) => selectedDocuments.includes( doc.id ) )
+										.filter( ( doc ) =>
+											selectedDocuments.includes( doc.id )
+										)
 										.map( ( doc ) => (
-											<li key={ doc.id }>{ doc.title }</li>
+											<li key={ doc.id }>
+												{ doc.title }
+											</li>
 										) ) }
 								</ul>
 							</div>
@@ -572,6 +660,39 @@ const DocumentList = ( {
 						saveButtonClassName="doc-repo-button save-button"
 					>
 						<div className="editable-metadata">
+							{ /* Excerpt field */ }
+							<div className="metadata-field">
+								<label htmlFor="excerpt">
+									{ __( 'Excerpt', 'bcgov-design-system' ) }
+								</label>
+								<TextareaControl
+									id="excerpt"
+									value={ editedValues.excerpt || '' }
+									onChange={ ( value ) => {
+										updateEditedField( 'excerpt', value );
+										// Auto-resize the textarea
+										setTimeout( () => {
+											const textarea =
+												document.getElementById(
+													'excerpt'
+												);
+											if ( textarea ) {
+												textarea.style.height = 'auto';
+												textarea.style.height =
+													textarea.scrollHeight +
+													'px';
+											}
+										}, 0 );
+									} }
+									placeholder={ __(
+										'Enter excerpt…',
+										'bcgov-design-system'
+									) }
+									rows={ 3 }
+									className="excerpt-textarea"
+								/>
+							</div>
+
 							{ metadataFields.map( ( field ) => (
 								<div
 									key={ field.id }
