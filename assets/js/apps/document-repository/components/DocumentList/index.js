@@ -3,7 +3,6 @@ import { Button, SelectControl, TextControl } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import ErrorBoundary from './ErrorBoundary';
 import DocumentTable from './DocumentTable';
-import VirtualDocumentTable from './VirtualDocumentTable';
 import UploadFeedback from './UploadFeedback';
 import MetadataModal from '../../../shared/components/MetadataModal';
 import UploadArea from './UploadArea';
@@ -17,9 +16,6 @@ import useErrorHandling from './hooks/useErrorHandling';
 import useMetadataManagement from './hooks/useMetadataManagement';
 import useFileHandling from './hooks/useFileHandling';
 import useDocumentManagement from './hooks/useDocumentManagement';
-
-// Define a threshold for when to use virtualization
-const VIRTUALIZATION_THRESHOLD = 50; // Use virtualization when there are more than 50 documents
 
 /**
  * DocumentList Component
@@ -356,11 +352,7 @@ const DocumentList = ( {
 					</div>
 				</div>
 
-				{ documents.length >= VIRTUALIZATION_THRESHOLD ? (
-					<VirtualDocumentTable { ...documentTableProps } />
-				) : (
-					<DocumentTable { ...documentTableProps } />
-				) }
+				<DocumentTable { ...documentTableProps } />
 
 				<PaginationControls
 					currentPage={ currentPage }
