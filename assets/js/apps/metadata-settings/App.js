@@ -76,8 +76,8 @@ const MetadataApp = () => {
 					const currentField = prev.modals[ modalType ].field;
 					let updates = { [ field ]: value };
 
-					// If the field being changed is the label, generate ID
-					if ( field === 'label' ) {
+					// If the field being added is the label, generate ID
+					if ( 'label' === field && 'add' === modalType ) {
 						const baseId = value
 							.toLowerCase()
 							.replace( /[^a-z0-9]+/g, '_' );
