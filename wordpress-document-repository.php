@@ -96,7 +96,7 @@ function wordpress_document_repository_override_permalink( $post_link, $post ) {
             $file_path = get_attached_file( $file_id );
             $file_url  = wp_get_attachment_url( $file_id );
 
-            if ( $file_path && strpos( $file_path, '/documents/' ) !== false ) {
+            if ( $file_path && false !== strpos( $file_path, '/documents/' ) ) {
                 $upload_dir = wp_upload_dir();
                 $file_url   = $upload_dir['baseurl'] . '/documents/' . basename( $file_path );
             }
