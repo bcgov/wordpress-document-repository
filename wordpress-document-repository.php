@@ -90,13 +90,23 @@ add_action( 'wp_insert_post', 'wordpress_document_repository_force_publish_after
  * @return string             The modified or original permalink.
  */
 function wordpress_document_repository_override_permalink( $post_link, $post ) {
-	if ( is_search() && isset( $post->post_type ) && 'document' === $post->post_type ) {
-		$file_url = get_post_meta( $post->ID, 'document_file_url', true );
-		if ( ! empty( $file_url ) ) {
-			return esc_url( $file_url );
-		}
-	}
-	return $post_link;
+    if ( is_search() && isset( $post->post_type ) && 'document' === $post->post_type ) {
+        $file_id = get_post_meta( $post->ID, 'document_file_id', true );
+        if ( $file_id ) {
+            $file_path = get_attached_file( $file_id );
+            $file_url  = wp_get_attachment_url( $file_id );
+
+            if ( $file_path && false !== strpos( $file_path, '/documents/' ) ) {
+                $upload_dir = wp_upload_dir();
+                $file_url   = $upload_dir['baseurl'] . '/documents/' . basename( $file_path );
+            }
+
+            if ( ! empty( $file_url ) ) {
+                return esc_url( $file_url );
+            }
+        }
+    }
+    return $post_link;
 }
 
 /**
