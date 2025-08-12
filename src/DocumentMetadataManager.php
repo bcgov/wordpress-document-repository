@@ -815,7 +815,7 @@ class DocumentMetadataManager {
             return false;
         }
 
-        $taxonomy_name = $this->get_taxonomy_name_for_field( $field['id'] );
+        $taxonomy_name = $field['id'];
 
         // Get existing terms.
         $existing_terms = get_terms(
