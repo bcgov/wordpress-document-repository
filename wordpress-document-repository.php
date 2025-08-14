@@ -77,6 +77,8 @@ if ( is_admin() ) {
 
 // Override document search results.
 add_filter( 'post_type_link', 'wordpress_document_repository_override_permalink', 10, 2 );
+// Append file type and size to document titles in search results.
+add_filter( 'the_title', 'wordpress_document_repository_append_file_info', 10, 2 );
 
 // Automatically publish documents when restored from trash.
 add_action( 'wp_insert_post', 'wordpress_document_repository_force_publish_after_untrash', 10, 3 );
@@ -107,6 +109,57 @@ function wordpress_document_repository_override_permalink( $post_link, $post ) {
         }
     }
     return $post_link;
+}
+
+/**
+ * Append file type and size to document titles in search results.
+ *
+ * Formats the document title to include the file extension in uppercase
+ * and the file size with one decimal precision, using KB for sizes under
+ * 1 MB and MB for sizes 1 MB or larger.
+ *
+ * If either the file type or size cannot be determined, the brackets are omitted.
+ * Applies only to 'document' post types in search results.
+ *
+ * @param string $title   The original post title.
+ * @param int    $post_id The current post ID.
+ * @return string          The modified or original title.
+ */
+function wordpress_document_repository_append_file_info( $title, $post_id ) {
+    if ( is_search() && 'document' === get_post_type( $post_id ) ) {
+        $file_id = get_post_meta( $post_id, 'document_file_id', true );
+        if ( $file_id ) {
+            $file_path = get_attached_file( $file_id );
+            if ( $file_path && file_exists( $file_path ) ) {
+                $file_type = strtoupper( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+
+                $size_bytes          = filesize( $file_path );
+                $file_size_formatted = '';
+
+                // Convert the file size to MB or KB as appropriate.
+                if ( $size_bytes > 0 ) {
+                    if ( $size_bytes >= 1048576 ) {
+                        $file_size_formatted = number_format_i18n( $size_bytes / 1048576, 1 ) . 'MB';
+                    } else {
+                        $file_size_formatted = number_format_i18n( $size_bytes / 1024, 1 ) . 'KB';
+                    }
+                }
+
+                // Add the file type and size to the title, if available.
+                $info_parts = [];
+                if ( $file_type ) {
+                    $info_parts[] = $file_type;
+                }
+                if ( $file_size_formatted ) {
+                    $info_parts[] = $file_size_formatted;
+                }
+                if ( ! empty( $info_parts ) ) {
+                    $title .= ' (' . implode( ', ', $info_parts ) . ')';
+                }
+            }
+        }
+    }
+    return $title;
 }
 
 /**
