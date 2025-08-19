@@ -79,6 +79,9 @@ const UploadArea = ( {
 			if ( files.length > 0 ) {
 				onFilesSelected( files );
 			}
+
+			// Reset the input in case the user tries to upload the same file(s).
+			e.target.value = null;
 		},
 		[ onFilesSelected ]
 	);

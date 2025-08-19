@@ -86,6 +86,24 @@ class RestApiController {
 
         register_rest_route(
             $namespace,
+            '/documents/check-duplicate',
+            [
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'check_duplicate_document' ],
+				'permission_callback' => [ $this, 'check_edit_permission' ],
+				'args'                => [
+					'search_name' => [
+						'type'              => 'string',
+						'required'          => true,
+						'description'       => 'Filename (with extension) to search for.',
+						'sanitize_callback' => 'sanitize_text_field',
+					],
+				],
+            ]
+		);
+
+        register_rest_route(
+            $namespace,
             '/documents/(?P<id>\d+)',
             [
                 [
@@ -348,6 +366,39 @@ class RestApiController {
 
         return new WP_REST_Response( $result, 200 );
     }
+
+    /**
+     * REST API callback to check for duplicate document filenames.
+     *
+     * Accepts a `search_name` parameter and queries the `document` post type
+     * for entries with a matching `document_file_name` meta value.
+     *
+     * @param WP_REST_Request $request The REST API request object. Expects a
+     *                                 'search_name' parameter representing the
+     *                                 filename to check.
+     *
+     * @return array
+     */
+    public function check_duplicate_document( WP_REST_Request $request ) {
+		$search_name = $request->get_param( 'search_name' );
+		if ( ! $search_name ) {
+			return [];
+		}
+
+		$query = new WP_Query(
+            [
+				'post_type'  => 'document',
+				'meta_key'   => 'document_file_name',
+				'meta_value' => $search_name,
+				'fields'     => 'ids',
+            ]
+        );
+
+		return [
+			'duplicate' => ! empty( $query->posts ),
+			'matches'   => $query->posts,
+		];
+	}
 
     /**
      * Get a single document.
