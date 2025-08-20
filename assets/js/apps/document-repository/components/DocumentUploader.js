@@ -38,7 +38,7 @@ import {
 	CardFooter,
 	Spinner,
 } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * State Management
@@ -160,8 +160,14 @@ const DocumentUploader = ( {
 
 			if ( isDuplicate ) {
 				setError(
-					`A document named "${ filenameWithoutExt }" already exists. ` +
-						`If you want to update this file, please use the document versioning system instead of uploading a new file with the same name.`
+					sprintf(
+						/* translators: %s: document filename */
+						__(
+							'A document named "%s" already exists. If you want to update this file, please use the document versioning system instead of uploading a new file with the same name.',
+							'wordpress-document-repository'
+						),
+						filenameWithoutExt
+					)
 				);
 				return false;
 			}
@@ -223,7 +229,7 @@ const DocumentUploader = ( {
 				err.message ||
 					__(
 						'Failed to check if a duplicate file exists',
-						'bcgov-design-system'
+						'wordpress-document-repository'
 					)
 			);
 			return false;

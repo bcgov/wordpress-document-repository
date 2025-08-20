@@ -379,7 +379,7 @@ class RestApiController {
      *
      * @return array
      */
-    public function check_duplicate_document( WP_REST_Request $request ) {
+    public function check_duplicate_document( WP_REST_Request $request ): array {
 		$search_name = $request->get_param( 'search_name' );
 		if ( ! $search_name ) {
 			return [];
