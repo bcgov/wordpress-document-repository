@@ -18,7 +18,7 @@
  * @package WordpressDocumentRepository
  */
 
- // Ensure WordPress is loaded.
+// Ensure WordPress is loaded.
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -28,6 +28,25 @@ use Bcgov\WordpressDocumentRepository\{
     Settings,
 };
 
+/**
+ * Check if we're in the site editor to avoid API conflicts.
+ *
+ * @return bool True if in site editor, false otherwise.
+ */
+function is_site_editor() {
+    if ( ! is_admin() || ! function_exists( 'get_current_screen' ) ) {
+        return false;
+    }
+
+    $screen = get_current_screen();
+    return $screen && (
+        'appearance_page_gutenberg-edit-site' === $screen->id ||
+        strpos( $screen->id, 'site-editor' ) !== false ||
+        strpos( $screen->id, 'gutenberg-edit-site' ) !== false
+    );
+}
+
+// Initialize autoloader.
 $local_composer = __DIR__ . '/vendor/autoload.php';
 if ( file_exists( $local_composer ) ) {
     require_once $local_composer;
@@ -45,44 +64,36 @@ if ( ! class_exists( 'Bcgov\\WordpressDocumentRepository\\Settings' ) ) {
     return;
 }
 
-/**
- * Initialize the plugin
- *
- * This function is called when the plugin is loaded.
- */
-function wordpress_document_repository_init() {
-}
-
-// Hook the function into the 'init' action.
-add_action( 'init', 'wordpress_document_repository_init' );
-
-
-// Initialize the Document Repository Settings.
+// Initialize services.
+$document_repository          = new DocumentRepository();
 $document_repository_settings = new Settings();
-$document_repository_settings->init();
 
-// Initialize Document Repository.
-$document_repository = new DocumentRepository();
-
-// Always register taxonomies first (needed in both admin and frontend).
+// Always register post types and taxonomies (needed everywhere).
 add_action( 'init', [ $document_repository, 'register_post_types' ] );
 add_action( 'init', [ $document_repository, 'register_metadata_taxonomies' ], 15 );
 
-// For admin area, initialize everything.
-if ( is_admin() ) {
-    $document_repository->init();
-} else { // For frontend, initialize only frontend-specific features.
-    $document_repository->init_frontend();
+// Only initialize plugin features if NOT in site editor.
+if ( ! is_site_editor() ) {
+    // Admin features.
+    if ( is_admin() ) {
+        add_action( 'admin_menu', [ $document_repository, 'register_admin_menus' ] );
+        add_action( 'admin_init', [ $document_repository, 'init_admin_without_menus' ] );
+        $document_repository_settings->init();
+    }
+
+    // Frontend features.
+    if ( ! is_admin() ) {
+        $document_repository->init_frontend();
+    }
+
+    // REST API routes.
+    add_action( 'rest_api_init', [ $document_repository, 'register_rest_routes' ], 10 );
+
+    // Frontend-specific hooks.
+    add_filter( 'post_type_link', 'wordpress_document_repository_override_permalink', 10, 2 );
+    add_filter( 'the_title', 'wordpress_document_repository_append_file_info', 10, 2 );
+    add_action( 'wp_insert_post', 'wordpress_document_repository_force_publish_after_untrash', 10, 3 );
 }
-
-// Override document search results.
-add_filter( 'post_type_link', 'wordpress_document_repository_override_permalink', 10, 2 );
-// Append file type and size to document titles in search results.
-add_filter( 'the_title', 'wordpress_document_repository_append_file_info', 10, 2 );
-
-// Automatically publish documents when restored from trash.
-add_action( 'wp_insert_post', 'wordpress_document_repository_force_publish_after_untrash', 10, 3 );
-
 
 /**
  * Override document post permalink in search results with the direct file URL.
@@ -135,7 +146,6 @@ function wordpress_document_repository_append_file_info( $title, $post_id ) {
 
                 $size_bytes          = filesize( $file_path );
                 $file_size_formatted = '';
-
                 // Convert the file size to MB or KB as appropriate.
                 if ( $size_bytes > 0 ) {
                     if ( $size_bytes >= 1048576 ) {
@@ -144,7 +154,6 @@ function wordpress_document_repository_append_file_info( $title, $post_id ) {
                         $file_size_formatted = number_format_i18n( $size_bytes / 1024, 1 ) . 'KB';
                     }
                 }
-
                 // Add the file type and size to the title, if available.
                 $info_parts = [];
                 if ( $file_type ) {

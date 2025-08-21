@@ -117,6 +117,32 @@ class DocumentRepository {
     }
 
     /**
+     * Initialize admin functionality without menus (for conditional loading).
+     *
+     * @return void
+     */
+    public function init_admin_without_menus(): void {
+        // Note: Post types and taxonomies are registered in the main plugin file.
+        // to avoid duplicate registrations between admin and frontend.
+
+        add_action( 'rest_api_init', [ $this, 'register_rest_routes' ], 10 );
+        add_action( 'admin_enqueue_scripts', [ $this->get_admin_ui_manager_instance(), 'enqueue_admin_scripts' ] );
+
+        // Event listeners.
+        add_action(
+            'bcgov_document_repository_document_uploaded',
+            [ $this->get_metadata_manager_instance(), 'clear_cache' ]
+        );
+
+        // Hook to re-register metadata fields when they are updated.
+        add_action( 'bcgov_document_repository_metadata_fields_updated', [ $this->get_document_post_type_instance(), 'register_metadata_fields' ] );
+        add_action( 'bcgov_document_repository_metadata_fields_updated', [ $this, 'register_metadata_taxonomies' ] );
+
+        // Migrate existing files to the new direct path structure.
+        add_action( 'admin_init', [ $this, 'migrate_existing_files' ] );
+    }
+
+    /**
      * Register metadata taxonomies.
      * This is called on the init hook with priority 15 to ensure post types are registered first.
      */
@@ -131,47 +157,7 @@ class DocumentRepository {
         $this->get_document_post_type_instance()->register();
     }
 
-    /**
-     * Log a debug message if WP_DEBUG is enabled.
-     *
-     * @param string $message The message to log.
-     * @param string $level The log level (default: 'debug').
-     * @return void
-     */
-    private function log( string $message, string $level = 'debug' ): void {
-        // In production, we disable all logging.
-        if ( defined( 'WP_ENVIRONMENT_TYPE' ) && WP_ENVIRONMENT_TYPE === 'production' ) {
-            return;
-        }
-
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            if ( function_exists( 'wp_debug_log' ) ) {
-                wp_debug_log( $message, $level );
-            } elseif ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
-                // Fallback for older WordPress versions.
-                $this->log_to_error_log( $message, $level );
-            }
-        }
-    }
-
-    /**
-     * Log a message using WordPress's built-in logging functions.
-     *
-     * @param string $message The message to log.
-     * @param string $level The log level.
-     * @return void
-     */
-    private function log_to_error_log( string $message, string $level ): void {
-        if ( function_exists( 'wp_debug_log' ) ) {
-            wp_debug_log( $message, $level );
-        } elseif ( function_exists( 'wp_log' ) ) {
-            wp_log( $message, $level );
-        } else {
-            // If no logging functions are available, silently fail.
-            // This is better than using error_log in production.
-            return;
-        }
-    }
+    // Logging methods removed for production - not needed for core functionality.
 
     /**
      * Register REST API routes.
@@ -179,50 +165,8 @@ class DocumentRepository {
      * @return void
      */
     public function register_rest_routes(): void {
-        // Add logging to help debug REST API issues.
-        $this->log( 'Registering Document Repository REST API routes' );
-
-        // Add CORS headers.
-        remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-        add_filter(
-            'rest_pre_serve_request',
-            function ( $value ) {
-                header( 'Access-Control-Allow-Origin: *' );
-                header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
-                header( 'Access-Control-Allow-Credentials: true' );
-                header( 'Access-Control-Allow-Headers: Authorization, X-WP-Nonce, Content-Type, X-Requested-With' );
-
-                // Handle preflight requests.
-                if ( 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
-                    status_header( 200 );
-                    exit();
-                }
-
-                return $value;
-            }
-        );
-
-        // Log authentication info for debugging.
-        if ( is_user_logged_in() ) {
-            $this->log( sprintf( 'REST API - User logged in, ID: %d', get_current_user_id() ) );
-            $this->log( sprintf( 'REST API - Nonce: %s', wp_create_nonce( 'wp_rest' ) ) );
-        } else {
-            $this->log( 'REST API - No user logged in' );
-        }
-
-        // Register the routes.
+        // Register the routes with proper namespacing to avoid conflicts.
         $this->get_rest_api_controller_instance()->register_routes();
-
-        // Log registered routes for debugging.
-        global $wp_rest_server;
-        if ( $wp_rest_server ) {
-            $routes = $wp_rest_server->get_routes();
-            foreach ( $routes as $route => $handlers ) {
-                if ( strpos( $route, 'bcgov-document-repository' ) !== false ) {
-                    $this->log( sprintf( 'Registered route: %s', $route ) );
-                }
-            }
-        }
     }
 
     /**
