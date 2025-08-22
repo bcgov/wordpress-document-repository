@@ -444,17 +444,9 @@ button.components-button.doc-repo-button.spreadsheet-toggle {
 	pointer-events: none;
 }
 
-/* Show active indicators */
-.metadata-save-status .docspinner[data-active="true"] {
-	opacity: 1;
-	pointer-events: auto;
-}
-
-.metadata-save-status .checkmark[data-active="true"] {
-	opacity: 1;
-	pointer-events: auto;
-}
-
+/* Active indicators */
+.metadata-save-status .docspinner[data-active="true"],
+.metadata-save-status .checkmark[data-active="true"],
 .metadata-save-status .error[data-active="true"] {
 	opacity: 1;
 	pointer-events: auto;
