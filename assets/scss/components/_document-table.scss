@@ -420,3 +420,83 @@ button.components-button.doc-repo-button.spreadsheet-toggle {
 .doc-repo-button.bulk-restore-button {
 	margin-right: $spacing-sm;
 }
+
+/* Wrapper for the save status indicators */
+.metadata-save-status {
+	width: 16px;
+	height: 16px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-left: 4px;
+	position: relative;
+}
+
+/* All inner indicators stacked on top of each other */
+.metadata-save-status .docspinner,
+.metadata-save-status .checkmark,
+.metadata-save-status .error {
+	position: absolute;
+	top: 0;
+	left: 0;
+	opacity: 0;
+	transition: opacity 0.5s ease;
+	pointer-events: none;
+}
+
+/* Show active indicators */
+.metadata-save-status .docspinner[data-active="true"] {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.metadata-save-status .checkmark[data-active="true"] {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.metadata-save-status .error[data-active="true"] {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+/* Spinner styling */
+.metadata-save-status .docspinner {
+	border: 2px solid rgba($color-primary, 0.2);
+	border-top: 2px solid rgba($color-primary, 0.9);
+	border-radius: 8px;
+	width: 8px;
+	height: 8px;
+	animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+
+	from {
+		transform: rotate(0deg);
+	}
+
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Checkmark styling */
+.metadata-save-status .checkmark {
+	color: rgba($color-success, 0.9);
+	font-size: 16px;
+}
+
+.metadata-save-status .checkmark::before {
+	content: "✔";
+}
+
+/* Error styling */
+.metadata-save-status .error {
+	color: rgba($color-error, 0.9);
+	font-size: 16px;
+}
+
+.metadata-save-status .error::before {
+	content: "✖";
+}

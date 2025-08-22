@@ -24,6 +24,7 @@ import DocumentTableRow from './DocumentTableRow';
  * @param {Function} props.onMetadataChange     - Callback when metadata is changed in spreadsheet mode
  * @param {Function} props.formatFileSize       - Function to format file size for display
  * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
+ * @param {Object}   props.saveStatus           - Autosave status for metadata fields (saving, saved, error, idle)
  * @return {JSX.Element} Rendered document table
  */
 function DocumentTable( {
@@ -41,6 +42,7 @@ function DocumentTable( {
 	onMetadataChange,
 	formatFileSize,
 	documentStatusFilter,
+	saveStatus,
 } ) {
 	// Check if all documents are currently selected
 	const allSelected =
@@ -130,6 +132,7 @@ function DocumentTable( {
 							formatFileSize={ formatFileSize }
 							documentStatusFilter={ documentStatusFilter }
 							excerpt={ document.excerpt }
+							saveStatus={ saveStatus }
 						/>
 					</SafeRender>
 				) ) }

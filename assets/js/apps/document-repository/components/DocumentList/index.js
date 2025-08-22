@@ -148,6 +148,7 @@ const DocumentList = ( {
 		handleMetadataChange,
 		toggleSpreadsheetMode,
 		handleSaveBulkChanges,
+		saveStatus,
 
 		// Document state
 		localDocuments,
@@ -198,6 +199,7 @@ const DocumentList = ( {
 			onMetadataChange: handleMetadataChange,
 			formatFileSize,
 			documentStatusFilter,
+			saveStatus,
 		} ),
 		[
 			localDocuments,
@@ -214,6 +216,7 @@ const DocumentList = ( {
 			setDeleteDocument,
 			setRestoreDocument,
 			documentStatusFilter,
+			saveStatus,
 		]
 	);
 

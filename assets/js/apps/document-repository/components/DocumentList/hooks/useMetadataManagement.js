@@ -1,5 +1,6 @@
 import {
 	useState,
+	useRef,
 	useEffect,
 	useCallback,
 	useReducer,
@@ -92,6 +93,17 @@ const metadataReducer = ( state, action ) => {
 				bulkEditedMetadata: {},
 				hasMetadataChanges: false,
 			};
+		case 'SET_FIELD_STATUS':
+			return {
+				...state,
+				saveStatus: {
+					...state.saveStatus,
+					[ action.documentId ]: {
+						...( state.saveStatus[ action.documentId ] || {} ),
+						[ action.fieldId ]: action.status,
+					},
+				},
+			};
 		default:
 			return state;
 	}
@@ -130,6 +142,7 @@ const useMetadataManagement = ( {
 		bulkEditedMetadata: {},
 		hasMetadataChanges: false,
 		isSavingBulk: false,
+		saveStatus: {},
 	} );
 
 	// Maintain local copy of documents
@@ -139,6 +152,9 @@ const useMetadataManagement = ( {
 	useEffect( () => {
 		setLocalDocuments( documents );
 	}, [ documents ] );
+
+	// Persistent autosave timers.
+	const saveTimers = useRef( {} );
 
 	/**
 	 * Check if metadata values have changed
@@ -211,71 +227,73 @@ const useMetadataManagement = ( {
 	 * @param {string} value      New value
 	 */
 	const handleMetadataChange = useCallback(
-		( documentId, fieldId, value ) => {
+		async ( documentId, fieldId, value ) => {
 			// Update bulk edited metadata
-			const prevDoc =
-				metadataState.bulkEditedMetadata[ documentId ] || {};
-			let newDoc;
-			if ( fieldId === 'excerpt' ) {
-				newDoc = {
-					...prevDoc,
-					excerpt: value,
-				};
-			} else {
-				newDoc = {
-					...prevDoc,
-					[ fieldId ]: value,
-				};
-			}
-			const newBulkMetadata = {
-				...metadataState.bulkEditedMetadata,
-				[ documentId ]: newDoc,
-			};
-
-			// Check if any metadata or excerpt has changed
-			const hasChanges = Object.entries( newBulkMetadata ).some(
-				( [ docId, editedMetadata ] ) => {
-					const currentDoc = localDocuments.find(
-						( doc ) => doc.id === parseInt( docId )
-					);
-					if ( ! currentDoc ) {
-						return false;
-					}
-					// Check metadata fields
-					const metadataChanged = metadataFields.some( ( field ) => {
-						const originalValue =
-							currentDoc.metadata?.[ field.id ] || '';
-						const isChanged =
-							String( originalValue ) !==
-							String( editedMetadata[ field.id ] || '' );
-						return isChanged;
-					} );
-					// Check excerpt
-					const originalExcerpt = currentDoc.excerpt || '';
-					const isExcerptChanged =
-						String( originalExcerpt ) !==
-						String( editedMetadata.excerpt || '' );
-					return metadataChanged || isExcerptChanged;
-				}
-			);
-
-			// Update state with changed value and hasChanges flag
 			dispatch( {
 				type: 'UPDATE_BULK_METADATA',
 				documentId,
 				fieldId,
 				value,
-				hasChanges,
+				hasChanges: true,
 			} );
 
-			// Do NOT update localDocuments here in spreadsheet mode
+			const key = `${ documentId }-${ fieldId }`;
+			if ( saveTimers.current[ key ] ) {
+				clearTimeout( saveTimers.current[ key ] );
+			}
+
+			saveTimers.current[ key ] = setTimeout( async () => {
+				dispatch( {
+					type: 'SET_FIELD_STATUS',
+					documentId: String( documentId ),
+					fieldId,
+					status: 'saving',
+				} );
+
+				try {
+					if ( fieldId === 'excerpt' ) {
+						await apiFetch( {
+							path: `/${ apiNamespace }/documents/${ documentId }`,
+							method: 'PUT',
+							data: { excerpt: value },
+						} );
+					} else {
+						await apiFetch( {
+							path: `/${ apiNamespace }/documents/${ documentId }/metadata`,
+							method: 'POST',
+							data: { [ fieldId ]: value },
+						} );
+					}
+
+					dispatch( {
+						type: 'SET_FIELD_STATUS',
+						documentId: String( documentId ),
+						fieldId,
+						status: 'saved',
+					} );
+
+					setTimeout( () => {
+						dispatch( {
+							type: 'SET_FIELD_STATUS',
+							documentId: String( documentId ),
+							fieldId,
+							status: 'idle',
+						} );
+					}, 3000 );
+				} catch ( error ) {
+					dispatch( {
+						type: 'SET_FIELD_STATUS',
+						documentId: String( documentId ),
+						fieldId,
+						status: 'error',
+					} );
+					if ( onError ) {
+						onError( 'metadata', documentId, error );
+					}
+				}
+			}, 3000 );
 		},
-		[
-			localDocuments,
-			metadataState.bulkEditedMetadata,
-			dispatch,
-			metadataFields,
-		]
+		[ apiNamespace, onError ]
 	);
 
 	/**
@@ -671,6 +689,7 @@ const useMetadataManagement = ( {
 		handleMetadataChange,
 		toggleSpreadsheetMode,
 		handleSaveBulkChanges,
+		saveStatus: metadataState.saveStatus,
 
 		// Document state
 		localDocuments,

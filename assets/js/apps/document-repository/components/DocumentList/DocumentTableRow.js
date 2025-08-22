@@ -28,6 +28,7 @@ import { isTrashView } from '../../utils/documentStatus';
  * @param {Function} props.onMetadataChange     - Callback when metadata is changed in spreadsheet mode
  * @param {Function} props.formatFileSize       - Function to format file size for display
  * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
+ * @param {Object}   props.saveStatus           - Autosave status for metadata fields (saving, saved, error, idle)
  * @return {JSX.Element} Rendered document table row
  */
 function DocumentTableRow( {
@@ -44,8 +45,12 @@ function DocumentTableRow( {
 	onMetadataChange,
 	formatFileSize,
 	documentStatusFilter,
+	saveStatus,
 } ) {
 	const renderMetadataField = ( field ) => {
+		// Compute save status for this specific field
+		const status = saveStatus?.[ document.id ]?.[ field.id ] || 'idle';
+
 		if ( ! isSpreadsheetMode ) {
 			const fieldValue =
 				document.metadata && document.metadata[ field.id ]
@@ -84,31 +89,36 @@ function DocumentTableRow( {
 			} );
 
 			return (
-				<SelectControl
-					value={ fieldValue }
-					options={ [
-						{
-							label: __( 'Select…', 'bcgov-design-system' ),
-							value: '',
-						},
-						...options,
-					] }
-					onChange={ ( newValue ) =>
-						onMetadataChange( document.id, field.id, newValue )
-					}
-				/>
+				<FieldWithStatus status={ status }>
+					<SelectControl
+						value={ fieldValue }
+						options={ [
+							{
+								label: __( 'Select…', 'bcgov-design-system' ),
+								value: '',
+							},
+							...options,
+						] }
+						onChange={ ( newValue ) =>
+							onMetadataChange( document.id, field.id, newValue )
+						}
+					/>
+				</FieldWithStatus>
 			);
 		}
 
+		// For text and date fields
 		return (
-			<TextControl
-				type={ field.type === 'date' ? 'date' : 'text' }
-				value={ fieldValue }
-				onChange={ ( newValue ) =>
-					onMetadataChange( document.id, field.id, newValue )
-				}
-				className="metadata-input"
-			/>
+			<FieldWithStatus status={ status }>
+				<TextControl
+					type={ 'date' === field.type ? 'date' : 'text' }
+					value={ fieldValue }
+					onChange={ ( newValue ) =>
+						onMetadataChange( document.id, field.id, newValue )
+					}
+					className="metadata-input"
+				/>
+			</FieldWithStatus>
 		);
 	};
 
@@ -253,38 +263,44 @@ function DocumentTableRow( {
 			{ /* Excerpt cell */ }
 			<div className="document-table-cell" role="cell">
 				{ isSpreadsheetMode ? (
-					<TextareaControl
-						value={
-							typeof bulkEditedMetadata?.[ document.id ]
-								?.excerpt !== 'undefined'
-								? bulkEditedMetadata[ document.id ].excerpt
-								: document.excerpt || ''
+					<FieldWithStatus
+						status={
+							saveStatus?.[ document.id ]?.excerpt || 'idle'
 						}
-						onChange={ ( newValue ) => {
-							onMetadataChange(
-								document.id,
-								'excerpt',
-								newValue
-							);
-							// Auto-resize the textarea
-							setTimeout( () => {
-								const textarea = document.querySelector(
-									`[data-document-id="${ document.id }"] textarea`
+					>
+						<TextareaControl
+							value={
+								typeof bulkEditedMetadata?.[ document.id ]
+									?.excerpt !== 'undefined'
+									? bulkEditedMetadata[ document.id ].excerpt
+									: document.excerpt || ''
+							}
+							onChange={ ( newValue ) => {
+								onMetadataChange(
+									document.id,
+									'excerpt',
+									newValue
 								);
-								if ( textarea ) {
-									textarea.style.height = 'auto';
-									textarea.style.height =
-										textarea.scrollHeight + 'px';
-								}
-							}, 0 );
-						} }
-						placeholder={ __(
-							'Enter excerpt…',
-							'bcgov-design-system'
-						) }
-						rows={ 2 }
-						className="excerpt-textarea"
-					/>
+								// Auto-resize the textarea
+								setTimeout( () => {
+									const textarea = document.querySelector(
+										`[data-document-id="${ document.id }"] textarea`
+									);
+									if ( textarea ) {
+										textarea.style.height = 'auto';
+										textarea.style.height =
+											textarea.scrollHeight + 'px';
+									}
+								}, 0 );
+							} }
+							placeholder={ __(
+								'Enter excerpt…',
+								'bcgov-design-system'
+							) }
+							rows={ 2 }
+							className="excerpt-textarea"
+						/>
+					</FieldWithStatus>
 				) : (
 					document.excerpt || '—'
 				) }
@@ -333,5 +349,44 @@ function DocumentTableRow( {
 		</div>
 	);
 }
+
+// Helper to render any field with a status indicator
+const FieldWithStatus = ( { children, status } ) => (
+	<div
+		style={ {
+			position: 'relative',
+			display: 'flex',
+			alignItems: 'center',
+		} }
+	>
+		{ children }
+		<SaveStatusIndicator status={ status } />
+	</div>
+);
+
+const SaveStatusIndicator = ( { status } ) => {
+	return (
+		<span className="metadata-save-status">
+			{ /* Spinner */ }
+			<span
+				className="docspinner"
+				aria-label="Saving…"
+				data-active={ 'saving' === status }
+			/>
+			{ /* Checkmark */ }
+			<span
+				className="checkmark"
+				aria-label="Saved"
+				data-active={ 'saved' === status }
+			/>
+			{ /* Error */ }
+			<span
+				className="error"
+				aria-label="Save failed"
+				data-active={ 'error' === status }
+			/>
+		</span>
+	);
+};
 
 export { DocumentTableRow as default };
