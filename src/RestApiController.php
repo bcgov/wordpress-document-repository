@@ -4,6 +4,7 @@ namespace Bcgov\WordpressDocumentRepository;
 
 use Bcgov\WordpressDocumentRepository\MediaUploadHelper;
 use Bcgov\WordpressDocumentRepository\RepositoryConfig;
+use Bcgov\WordpressDocumentRepository\CsvBulkUploader;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
@@ -79,6 +80,31 @@ class RestApiController {
                 [
                     'methods'             => 'POST',
                     'callback'            => [ $this, 'create_document' ],
+                    'permission_callback' => [ $this, 'check_edit_permission' ],
+                ],
+            ]
+        );
+
+        // CSV Bulk Upload endpoints.
+        register_rest_route(
+            $namespace,
+            '/csv-bulk-upload',
+            [
+                [
+                    'methods'             => 'POST',
+                    'callback'            => [ $this, 'process_csv_bulk_upload' ],
+                    'permission_callback' => [ $this, 'check_edit_permission' ],
+                ],
+            ]
+        );
+
+        register_rest_route(
+            $namespace,
+            '/csv-bulk-upload/template',
+            [
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [ $this, 'download_csv_template' ],
                     'permission_callback' => [ $this, 'check_edit_permission' ],
                 ],
             ]
@@ -1021,5 +1047,100 @@ class RestApiController {
         }
 
         return new WP_REST_Response( $updated_document, 200 );
+    }
+
+    /**
+     * Process CSV bulk upload for document tagging.
+     *
+     * @param WP_REST_Request $request The request object.
+     * @return WP_REST_Response|WP_Error The response object or error.
+     */
+    public function process_csv_bulk_upload( WP_REST_Request $request ) {
+        try {
+            // Verify nonce for file upload.
+            if ( ! wp_verify_nonce( $request->get_header( 'X-WP-Nonce' ), 'wp_rest' ) ) {
+                return new WP_Error(
+                    'invalid_nonce',
+                    'Invalid security token',
+                    [ 'status' => 403 ]
+                );
+            }
+
+            // Extract the CSV file data.
+            $file = $request->get_file_params()['csv_file'] ?? null;
+
+            if ( ! $file ) {
+                // Try to get it from $_FILES directly as a fallback.
+                if ( ! empty( $_FILES['csv_file'] ) && is_array( $_FILES['csv_file'] ) ) {
+                    $file = $_FILES['csv_file'];
+                } else {
+                    return new WP_Error(
+                        'missing_csv_file',
+                        'No CSV file was uploaded',
+                        [ 'status' => 400 ]
+                    );
+                }
+            }
+
+            // Get processing options from request.
+            $options = [];
+            $json_options = $request->get_param( 'options' );
+
+            if ( $json_options ) {
+                $options = json_decode( $json_options, true );
+                if ( json_last_error() !== JSON_ERROR_NONE ) {
+                    return new WP_Error(
+                        'invalid_options',
+                        'Invalid options JSON: ' . json_last_error_msg(),
+                        [ 'status' => 400 ]
+                    );
+                }
+            }
+
+            // Create CSV bulk uploader instance.
+            $csv_uploader = new CsvBulkUploader( $this->config, $this->uploader, $this->metadata_manager );
+
+            // Process CSV file.
+            $result = $csv_uploader->process_csv_bulk_upload( $file, $options );
+
+            if ( is_wp_error( $result ) ) {
+                return $result;
+            }
+
+            return new WP_REST_Response( $result, 200 );
+
+        } catch ( \Exception $e ) {
+            return new WP_Error(
+                'csv_processing_exception',
+                'An unexpected error occurred during CSV processing: ' . $e->getMessage(),
+                [ 'status' => 500 ]
+            );
+        }
+    }
+
+    /**
+     * Download CSV template for bulk upload.
+     *
+     * @param WP_REST_Request $request The request object.
+     * @return WP_REST_Response|WP_Error The response object or error.
+     */
+    public function download_csv_template( WP_REST_Request $request ) {
+        try {
+            // Create CSV bulk uploader instance.
+            $csv_uploader = new CsvBulkUploader( $this->config, $this->uploader, $this->metadata_manager );
+
+            // Download template.
+            $csv_uploader->download_csv_template();
+
+            // This should not be reached as download_csv_template() calls exit.
+            return new WP_REST_Response( ['message' => 'Template downloaded'], 200 );
+
+        } catch ( \Exception $e ) {
+            return new WP_Error(
+                'template_download_exception',
+                'An unexpected error occurred during template download: ' . $e->getMessage(),
+                [ 'status' => 500 ]
+            );
+        }
     }
 }

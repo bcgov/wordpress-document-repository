@@ -1,0 +1,103 @@
+.csv-bulk-uploader {
+	margin-top: 1rem;
+
+	.csv-info {
+		margin-bottom: 1.5rem;
+
+		p {
+			margin-bottom: 1rem;
+			color: #666;
+		}
+	}
+
+	.csv-upload-section,
+	.csv-options-section {
+		margin-bottom: 1.5rem;
+
+		h4 {
+			margin-bottom: 0.75rem;
+			font-size: 1rem;
+			font-weight: 600;
+		}
+
+		.selected-file {
+			margin-top: 0.5rem;
+			padding: 0.5rem;
+			background-color: #f0f0f1;
+			border-radius: 4px;
+			font-size: 0.875rem;
+			color: #50575e;
+		}
+	}
+
+	.csv-options-section {
+		label {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-size: 0.875rem;
+
+			input[type="checkbox"] {
+				margin: 0;
+			}
+		}
+	}
+
+	.card-actions {
+		display: flex;
+		gap: 0.75rem;
+		justify-content: flex-end;
+		align-items: center;
+	}
+}
+
+.csv-bulk-uploader-modal {
+	.csv-upload-section,
+	.csv-options-section {
+		margin-bottom: 1.5rem;
+
+		h4 {
+			margin-bottom: 0.75rem;
+			font-size: 1rem;
+			font-weight: 600;
+		}
+
+		.selected-file {
+			margin-top: 0.5rem;
+			padding: 0.5rem;
+			background-color: #f0f0f1;
+			border-radius: 4px;
+			font-size: 0.875rem;
+			color: #50575e;
+		}
+	}
+
+	.csv-options-section {
+		label {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-size: 0.875rem;
+
+			input[type="checkbox"] {
+				margin: 0;
+			}
+		}
+	}
+
+	.modal-actions {
+		display: flex;
+		gap: 0.75rem;
+		justify-content: flex-end;
+		align-items: center;
+		margin-top: 1.5rem;
+	}
+}
+
+// Integration with document list
+.document-list__right-actions {
+	.csv-bulk-uploader {
+		margin-top: 0;
+		margin-left: 1rem;
+	}
+} 

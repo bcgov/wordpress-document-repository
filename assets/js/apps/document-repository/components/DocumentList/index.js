@@ -11,6 +11,7 @@ import DocumentTable from './DocumentTable';
 import UploadFeedback from './UploadFeedback';
 import MetadataModal from '../../../shared/components/MetadataModal';
 import UploadArea from './UploadArea';
+import CsvBulkUploader from '../CsvBulkUploader';
 import PaginationControls from './PaginationControls';
 import RetryNotice from './RetryNotice';
 import { isAllView, isTrashView } from '../../utils/documentStatus';
@@ -221,6 +222,23 @@ const DocumentList = ( {
 		handleFiles( files );
 	};
 
+	const handleCsvUploadSuccess = ( results ) => {
+		// Show success notification
+		showNotification(
+			sprintf(
+				/* translators: %d: number of documents */
+				__( 'Successfully processed CSV and tagged %d documents', 'wordpress-document-repository' ),
+				results.documents_found
+			),
+			'success'
+		);
+
+		// Refresh documents list to show updated metadata
+		if ( onDocumentsUpdate ) {
+			onDocumentsUpdate();
+		}
+	};
+
 	// Helper functions to avoid nested ternary expressions
 	const getSingleDeleteButtonText = () => {
 		if ( isDeleting ) {
@@ -280,6 +298,7 @@ const DocumentList = ( {
 					</div>
 					<div className="document-list__right-actions">
 						<UploadArea onFilesSelected={ handleFilesWithLog } />
+						<CsvBulkUploader onUploadSuccess={ handleCsvUploadSuccess } />
 					</div>
 				</div>
 
