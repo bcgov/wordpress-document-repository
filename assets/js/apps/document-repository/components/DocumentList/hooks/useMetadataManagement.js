@@ -457,22 +457,47 @@ const useMetadataManagement = ( {
 			if ( enabled ) {
 				// Initialize bulk edit metadata when entering spreadsheet mode
 				const initialBulkMetadata = {};
-				localDocuments.forEach( ( doc ) => {
+				( localDocuments || [] ).forEach( ( doc ) => {
 					initialBulkMetadata[ doc.id ] = {
 						...( doc.metadata || {} ),
-						excerpt: doc.excerpt || '', // Include excerpt in initial state
+						excerpt: doc.excerpt || '',
 					};
 				} );
-
 				dispatch( {
 					type: 'ENTER_SPREADSHEET_MODE',
 					initialBulkValues: initialBulkMetadata,
 				} );
 			} else {
+				// exiting spreadsheet mode — optimistically merge edits into local docs
+				const { bulkEditedMetadata } = metadataState;
+
+				const mergedDocuments = localDocuments.map( ( doc ) => {
+					const edits = bulkEditedMetadata?.[ doc.id ];
+					if ( ! edits ) return doc;
+
+					return {
+						...doc,
+						metadata: {
+							...( doc.metadata || {} ),
+							...edits,
+						},
+						excerpt: edits.excerpt ?? doc.excerpt,
+					};
+				} );
+
+				// update local state
+				setLocalDocuments( mergedDocuments );
+
+				// tell parent
+				if ( typeof onUpdateDocuments === 'function' ) {
+					onUpdateDocuments( mergedDocuments );
+				}
+
+				// clear spreadsheet state
 				dispatch( { type: 'EXIT_SPREADSHEET_MODE' } );
 			}
 		},
-		[ localDocuments ]
+		[ localDocuments, metadataState, onUpdateDocuments ]
 	);
 
 	/**
