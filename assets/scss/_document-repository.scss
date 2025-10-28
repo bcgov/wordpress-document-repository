@@ -18,15 +18,15 @@
    Base Element Styles - Least Specific
    ========================================= */
 
-// Basic SVG icon styles - less specific SVG selectors first
-svg {
+// Basic SVG icon styles - scoped to document repository
+.document-repository svg {
 	width: 1.25rem;
 	height: 1.25rem;
 	transition: all 0.2s ease;
 }
 
-// Basic paragraph styles
-p {
+// Basic paragraph styles - scoped to document repository
+.document-repository p {
 	line-height: 1.5;
 	margin: 0 0 1rem;
 }
@@ -35,8 +35,8 @@ p {
    General Components - Medium Specificity
    ========================================= */
 
-// Table styles
-table {
+// Table styles - scoped to document repository
+.document-repository table {
 	width: 100%;
 	border-collapse: collapse;
 
