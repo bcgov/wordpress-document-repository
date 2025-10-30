@@ -172,17 +172,6 @@ class DocumentUploader {
             );
         }
 
-        // Check for duplicate title if provided in metadata.
-        if ( ! empty( $metadata['title'] ) ) {
-            $duplicate = $this->check_for_duplicate( $metadata['title'] );
-            if ( $duplicate ) {
-                return new WP_Error(
-                    'duplicate_document',
-                    'A document with this title already exists.',
-                    [ 'duplicate_id' => $duplicate->ID ]
-                );
-            }
-        }
 
         // Set default title if not provided.
         if ( empty( $metadata['title'] ) ) {
@@ -227,6 +216,37 @@ class DocumentUploader {
                 'Failed to create attachment: ' . $attachment_id->get_error_message(),
                 [ 'original_error' => $attachment_id->get_error_data() ]
             );
+        }
+
+        // Check for a duplicate attachment name.
+        $existing_attachment = null;
+        if ( ! empty( $metadata[ 'title' ] ) ) {
+            $existing_attachment = $this->check_for_duplicate( $metadata[ 'title' ] );
+        }
+
+        // If there is already an attachment by that name, use versioning.
+        if ( $existing_attachment ) {
+            $doc_id = $existing_attachment->ID;
+
+            // Preserve the old file in versioning.
+            $old_file_id = get_post_meta( $doc_id, 'document_file_id', true );
+            if ( $old_file_id ) {
+                $versions = get_post_meta( $doc_id, 'document_file_versions', true ) ?: [];
+                $versions[] = $old_file_id;
+                update_post_meta( $doc_id, 'document_file_versions', $versions );
+            }
+
+            // Update the current file.
+            update_post_meta( $doc_id, 'document_file_id', $attachment_id );
+
+            // Store reference to document post in attachment meta.
+            update_post_meta( $attachment_id, '_document_repository_post_id', $doc_id );
+
+            // Hook for version upload
+            do_action( 'bcgov_document_repository_document_version_uploaded', $doc_id, $attachment_id, $old_file_id );
+
+            // Get full document data.
+            return $this->get_document_data( $doc_id );
         }
 
         // Create document post.
@@ -276,6 +296,12 @@ class DocumentUploader {
 
         // Save attachment ID as post meta.
         update_post_meta( $post_id, 'document_file_id', $attachment_id );
+
+        // Save version history.
+        $versions = get_post_meta( $post_id, 'document_file_versions', true ) ?: [];
+        $versions[] = $attachment_id;
+        update_post_meta( $post_id, 'document_file_versions', $versions );
+
 
         // Get metadata manager to check field types.
         $metadata_manager = new DocumentMetadataManager( $this->config );

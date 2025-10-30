@@ -63,7 +63,7 @@ class DocumentPostType {
                 'items_list_navigation' => sprintf( '%s list navigation', $label ),
                 'items_list'            => sprintf( '%s list', $label ),
             ],
-            'supports'            => [ 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'custom-fields' ],
+            'supports'            => [ 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'custom-fields', 'revisions' ],
             'hierarchical'        => false,
             'public'              => true,
             'show_ui'             => true,
@@ -126,6 +126,25 @@ class DocumentPostType {
         foreach ( $standard_fields as $field_id => $schema ) {
             register_post_meta( $post_type, $field_id, $schema );
         }
+
+        // Track current attachment.
+        register_post_meta( $post_type, 'document_file_id', [
+            'show_in_rest' => true,
+            'single'       => true,
+            'type'         => 'integer',
+        ] );
+
+        // Track previous versions.
+        register_post_meta( $post_type, 'document_file_versions', [
+            'single' => true,
+            'type'   => 'array',
+            'show_in_rest' => [
+                'schema' => [
+                    'type'  => 'array',
+                    'items' => [ 'type' => 'integer' ],
+                ],
+            ],
+        ] );
     }
 
     /**
