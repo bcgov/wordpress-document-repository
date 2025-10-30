@@ -172,7 +172,6 @@ class DocumentUploader {
             );
         }
 
-
         // Set default title if not provided.
         if ( empty( $metadata['title'] ) ) {
             $metadata['title'] = pathinfo( $file['name'], PATHINFO_FILENAME );
@@ -220,8 +219,8 @@ class DocumentUploader {
 
         // Check for a duplicate attachment name.
         $existing_attachment = null;
-        if ( ! empty( $metadata[ 'title' ] ) ) {
-            $existing_attachment = $this->check_for_duplicate( $metadata[ 'title' ] );
+        if ( ! empty( $metadata['title'] ) ) {
+            $existing_attachment = $this->check_for_duplicate( $metadata['title'] );
         }
 
         // If there is already an attachment by that name, use versioning.
@@ -231,7 +230,8 @@ class DocumentUploader {
             // Preserve the old file in versioning.
             $old_file_id = get_post_meta( $doc_id, 'document_file_id', true );
             if ( $old_file_id ) {
-                $versions = get_post_meta( $doc_id, 'document_file_versions', true ) ?: [];
+                $versions   = get_post_meta( $doc_id, 'document_file_versions', true );
+                $versions   = is_array( $versions ) ? $versions : [];
                 $versions[] = $old_file_id;
                 update_post_meta( $doc_id, 'document_file_versions', $versions );
             }
@@ -242,7 +242,7 @@ class DocumentUploader {
             // Store reference to document post in attachment meta.
             update_post_meta( $attachment_id, '_document_repository_post_id', $doc_id );
 
-            // Hook for version upload
+            // Hook for version upload.
             do_action( 'bcgov_document_repository_document_version_uploaded', $doc_id, $attachment_id, $old_file_id );
 
             // Get full document data.
@@ -298,10 +298,11 @@ class DocumentUploader {
         update_post_meta( $post_id, 'document_file_id', $attachment_id );
 
         // Save version history.
-        $versions = get_post_meta( $post_id, 'document_file_versions', true ) ?: [];
+        $versions = get_post_meta( $post_id, 'document_file_versions', true );
+        $versions = is_array( $versions ) ? $versions : [];
+
         $versions[] = $attachment_id;
         update_post_meta( $post_id, 'document_file_versions', $versions );
-
 
         // Get metadata manager to check field types.
         $metadata_manager = new DocumentMetadataManager( $this->config );

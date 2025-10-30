@@ -388,20 +388,6 @@ const DocumentUploader = ( {
 			setUploadSuccess( true );
 			setIsUploading( false );
 
-			// Integrate document revisions.
-			const documentId = data.document?.id;
-    		const revisionId = data.revision?.id;
-
-			// Save metadata to parent document.
-			if ( documentId ) {
-				await saveMetadata( documentId, metadata );
-			}
-
-			// Save metadata to revision, if it exists.
-			if ( revisionId ) {
-				await saveMetadata( revisionId, metadata );
-			}
-
 			// Notify parent of successful upload
 			if ( onUploadSuccess ) {
 				onUploadSuccess( data.document );

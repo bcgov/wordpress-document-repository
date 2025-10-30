@@ -128,23 +128,31 @@ class DocumentPostType {
         }
 
         // Track current attachment.
-        register_post_meta( $post_type, 'document_file_id', [
-            'show_in_rest' => true,
-            'single'       => true,
-            'type'         => 'integer',
-        ] );
+        register_post_meta(
+            $post_type,
+            'document_file_id',
+            [
+				'show_in_rest' => true,
+				'single'       => true,
+				'type'         => 'integer',
+			]
+        );
 
         // Track previous versions.
-        register_post_meta( $post_type, 'document_file_versions', [
-            'single' => true,
-            'type'   => 'array',
-            'show_in_rest' => [
-                'schema' => [
-                    'type'  => 'array',
-                    'items' => [ 'type' => 'integer' ],
-                ],
-            ],
-        ] );
+        register_post_meta(
+            $post_type,
+            'document_file_versions',
+            [
+				'single'       => true,
+				'type'         => 'array',
+				'show_in_rest' => [
+					'schema' => [
+						'type'  => 'array',
+						'items' => [ 'type' => 'integer' ],
+					],
+				],
+			]
+        );
     }
 
     /**
