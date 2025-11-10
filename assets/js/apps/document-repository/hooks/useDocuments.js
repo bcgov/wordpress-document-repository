@@ -47,7 +47,7 @@ export const useDocuments = () => {
 	// Search and pagination parameters
 	const [ searchParams, setSearchParams ] = useState( {
 		page: 1,
-		per_page: window.documentRepositorySettings?.perPage || 20,
+		per_page: window.documentRepositorySettings?.perPage || 2000,
 		orderby: 'date',
 		order: 'DESC',
 		status: 'all',
