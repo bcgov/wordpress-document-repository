@@ -34,7 +34,7 @@ class RepositoryConfig {
         'allowed_mime_types' => [
             'pdf' => 'application/pdf',
         ],
-        'max_file_size'      => 20 * 1024 * 1024, // 20MB.
+        'max_file_size'      => 50 * 1024 * 1024, // 50MB.
 
         // REST API settings.
         'api_namespace'      => 'bcgov-document-repository/v1',
