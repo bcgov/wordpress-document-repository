@@ -88,6 +88,7 @@ export const useDocuments = () => {
 			} );
 
 			// Add timeout to prevent indefinite loading
+			// Increased timeout for large document sets (500+ documents)
 			const timeoutPromise = new Promise( ( _, reject ) => {
 				setTimeout( () => {
 					reject(
@@ -95,7 +96,7 @@ export const useDocuments = () => {
 							'Document fetch request timed out. Please try again.'
 						)
 					);
-				}, 5000 ); // 5 second timeout
+				}, 60000 ); // 60 second timeout for large document sets
 			} );
 
 			// Fetch documents from API with timeout

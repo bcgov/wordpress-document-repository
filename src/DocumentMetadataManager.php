@@ -602,6 +602,9 @@ class DocumentMetadataManager {
             'orderby'        => $args['orderby'],
             'order'          => $args['order'],
             'post_status'    => $post_status,
+            'no_found_rows'  => false, // We need found_posts for pagination
+            'update_post_meta_cache' => true, // Cache post meta
+            'update_post_term_cache' => true, // Cache taxonomy terms
         ];
 
         // Add search.
