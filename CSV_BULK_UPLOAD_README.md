@@ -5,7 +5,7 @@ This feature allows you to upload CSV files to automatically tag existing docume
 ## How It Works
 
 1. **CSV Structure**: Upload a CSV file with columns for document titles/names and metadata fields
-2. **Auto-Matching**: The system finds existing documents by title and applies metadata from the CSV
+2. **Auto-Matching**: The system finds existing documents by title and applies metadata from the CSV.
 3. **Bulk Processing**: Process hundreds of documents at once instead of editing them individually
 
 ## CSV Format Requirements
