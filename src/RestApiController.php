@@ -1057,6 +1057,13 @@ class RestApiController {
      */
     public function process_csv_bulk_upload( WP_REST_Request $request ) {
         try {
+            // Increase execution time and memory limit for large CSV processing
+            set_time_limit( 300 ); // 5 minutes
+            if ( function_exists( 'ini_set' ) ) {
+                @ini_set( 'max_execution_time', '300' );
+                @ini_set( 'memory_limit', '512M' );
+            }
+            
             // Verify nonce for file upload.
             if ( ! wp_verify_nonce( $request->get_header( 'X-WP-Nonce' ), 'wp_rest' ) ) {
                 return new WP_Error(

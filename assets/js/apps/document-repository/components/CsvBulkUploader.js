@@ -98,6 +98,10 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 		formData.append( '_wpnonce', window.documentRepositorySettings.nonce );
 
 		try {
+			// Create AbortController for timeout
+			const controller = new AbortController();
+			const timeoutId = setTimeout( () => controller.abort(), 300000 ); // 5 minutes timeout
+
 			const response = await fetch(
 				`${ window.documentRepositorySettings.apiRoot }${ apiNamespace }/csv-bulk-upload`,
 				{
@@ -106,11 +110,44 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 						'X-WP-Nonce': window.documentRepositorySettings.nonce,
 					},
 					body: formData,
+					signal: controller.signal,
 				}
 			);
 
+			clearTimeout( timeoutId );
+
+			// Check if response is OK
 			if ( ! response.ok ) {
-				const errorData = await response.json();
+				// Handle 504 Gateway Timeout specifically
+				if ( response.status === 504 ) {
+					throw new Error(
+						'Request timed out. The CSV file may be too large or the server is taking too long to process. Please try processing a smaller batch or contact your administrator.'
+					);
+				}
+
+				// Try to parse error as JSON, but handle HTML error pages
+				let errorData;
+				const contentType = response.headers.get( 'content-type' );
+				if ( contentType && contentType.includes( 'application/json' ) ) {
+					try {
+						errorData = await response.json();
+					} catch ( e ) {
+						errorData = { message: `Server error (${ response.status })` };
+					}
+				} else {
+					// Response is HTML (like a 504 error page)
+					const text = await response.text();
+					if ( response.status === 504 ) {
+						errorData = {
+							message:
+								'Gateway timeout. The server took too long to process your CSV file. Please try processing a smaller batch or contact your administrator.',
+						};
+					} else {
+						errorData = {
+							message: `Server error (${ response.status }). Please try again or contact your administrator.`,
+						};
+					}
+				}
 				throw new Error( errorData.message || 'Upload failed' );
 			}
 
@@ -121,7 +158,13 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 				onUploadSuccess( data );
 			}
 		} catch ( err ) {
-			setError( err.message || 'Failed to process CSV file.' );
+			if ( err.name === 'AbortError' ) {
+				setError(
+					'Request timed out after 5 minutes. The CSV file may be too large. Please try processing a smaller batch or contact your administrator.'
+				);
+			} else {
+				setError( err.message || 'Failed to process CSV file.' );
+			}
 		} finally {
 			setIsProcessing( false );
 		}
