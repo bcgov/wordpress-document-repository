@@ -374,14 +374,32 @@ class DocumentUploader {
         // Get metadata manager.
         $metadata_manager = new DocumentMetadataManager( $this->config );
 
-        // Return document data.
+        // Get revisions for this post to expose to the REST response.
+        $revisions            = wp_get_post_revisions( $post->ID );
+        $revision_count       = is_array( $revisions ) ? count( $revisions ) : 0;
+        $latest_revision_id   = null;
+        $latest_revision_link = '';
+        if ( $revision_count > 0 ) {
+            // wp_get_post_revisions returns an array keyed by revision ID with newest first in recent WP versions,
+            // but to be explicit, use array_keys and pick the first value.
+            $rev_keys             = array_keys( $revisions );
+            $latest_revision_id   = (int) reset( $rev_keys );
+            $latest_revision_link = admin_url( 'revision.php?revision=' . $latest_revision_id );
+        }
+
+        // Return document data including revision info so the UI can render a link to the diff viewer.
         return [
-            'id'       => $post->ID,
-            'title'    => $post->post_title,
-            'date'     => $post->post_date,
-            'author'   => get_the_author_meta( 'display_name', $post->post_author ),
-            'excerpt'  => $post->post_excerpt,
-            'metadata' => $metadata_manager->get_document_metadata( $post->ID ),
+            'id'        => $post->ID,
+            'title'     => $post->post_title,
+            'date'      => $post->post_date,
+            'author'    => get_the_author_meta( 'display_name', $post->post_author ),
+            'excerpt'   => $post->post_excerpt,
+            'metadata'  => $metadata_manager->get_document_metadata( $post->ID ),
+            'revisions' => [
+                'count'       => $revision_count,
+                'latest'      => $latest_revision_id,
+                'latest_link' => $latest_revision_link,
+            ],
         ];
     }
 
