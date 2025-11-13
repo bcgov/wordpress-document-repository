@@ -625,13 +625,31 @@ class DocumentMetadataManager {
         // Format results.
         $documents = [];
         foreach ( $query->posts as $post ) {
+            // Get revisions for this post to expose revision link to the UI.
+            $revisions            = wp_get_post_revisions( $post->ID );
+            $revision_count       = is_array( $revisions ) ? count( $revisions ) : 0;
+            $latest_revision_id   = null;
+            $latest_revision_link = '';
+            if ( $revision_count > 0 ) {
+                // wp_get_post_revisions returns an array keyed by revision ID with newest first,
+                // pick the first key as the latest revision.
+                $rev_keys             = array_keys( $revisions );
+                $latest_revision_id   = (int) reset( $rev_keys );
+                $latest_revision_link = admin_url( 'revision.php?revision=' . $latest_revision_id );
+            }
+
             $documents[] = [
-                'id'       => $post->ID,
-                'title'    => $post->post_title,
-                'date'     => $post->post_date,
-                'author'   => get_the_author_meta( 'display_name', $post->post_author ),
-                'excerpt'  => $post->post_excerpt, // <-- Added excerpt
-                'metadata' => $this->get_document_metadata( $post->ID ),
+                'id'        => $post->ID,
+                'title'     => $post->post_title,
+                'date'      => $post->post_date,
+                'author'    => get_the_author_meta( 'display_name', $post->post_author ),
+                'excerpt'   => $post->post_excerpt,
+                'metadata'  => $this->get_document_metadata( $post->ID ),
+                'revisions' => [
+                    'count'       => $revision_count,
+                    'latest'      => $latest_revision_id,
+                    'latest_link' => $latest_revision_link,
+                ],
             ];
         }
 

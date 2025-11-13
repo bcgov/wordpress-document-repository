@@ -320,6 +320,41 @@ function DocumentTableRow( {
 					: '—' }
 			</div>
 
+			{ /* Revisions cell - clickable badge showing revision count */ }
+			<div className="document-table-cell revisions-cell" role="cell">
+				{ document.revisions && document.revisions.count > 0 ? (
+					<button
+						onClick={ () => {
+							if ( document.revisions.latest_link ) {
+								window.open(
+									document.revisions.latest_link,
+									'_blank'
+								);
+							}
+						} }
+						className="revisions-badge"
+						title={ sprintf(
+							/* translators: %d: number of revisions */
+							__( 'View %d revision(s)', 'bcgov-design-system' ),
+							document.revisions.count
+						) }
+						aria-label={ sprintf(
+							/* translators: %d: number of revisions */
+							__( 'View %d revision(s)', 'bcgov-design-system' ),
+							document.revisions.count
+						) }
+					>
+						{ sprintf(
+							/* translators: %d: number of revisions */
+							__( '%d revision(s)', 'bcgov-design-system' ),
+							document.revisions.count
+						) }
+					</button>
+				) : (
+					'—'
+				) }
+			</div>
+
 			{ /* Actions cell - only shown in regular mode */ }
 			<div
 				className="document-table-cell actions"

@@ -99,6 +99,13 @@ function DocumentTable( {
 					>
 						{ __( 'Type', 'bcgov-design-system' ) }
 					</div>
+					{ /* Revisions column */ }
+					<div
+						className="document-table-cell header"
+						role="columnheader"
+					>
+						{ __( 'Revisions', 'bcgov-design-system' ) }
+					</div>
 					{ /* Actions column */ }
 					<div
 						className="document-table-cell header"
