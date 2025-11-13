@@ -25,6 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Bcgov\WordpressDocumentRepository\{
     DocumentRepository,
+    DocumentRevisionManager,
     Settings,
 };
 
@@ -67,6 +68,10 @@ if ( ! class_exists( 'Bcgov\\WordpressDocumentRepository\\Settings' ) ) {
 // Initialize services.
 $document_repository          = new DocumentRepository();
 $document_repository_settings = new Settings();
+
+// Document rrevisions.
+$revision_manager = new DocumentRevisionManager();
+$revision_manager->init();
 
 // Always register post types and taxonomies (needed everywhere).
 add_action( 'init', [ $document_repository, 'register_post_types' ] );
