@@ -157,12 +157,17 @@ const useMetadataManagement = ( {
 			return currentValue !== editedValue;
 		} );
 
+		// Check title
+		const currentTitle = editingMetadata.title || '';
+		const editedTitle = editedValues.title || '';
+		const titleChanged = currentTitle !== editedTitle;
+
 		// Check excerpt
 		const currentExcerpt = editingMetadata.excerpt || '';
 		const editedExcerpt = editedValues.excerpt || '';
 		const excerptChanged = currentExcerpt !== editedExcerpt;
 
-		return metadataChanged || excerptChanged;
+		return metadataChanged || titleChanged || excerptChanged;
 	}, [ metadataState, metadataFields ] );
 
 	/**
@@ -191,6 +196,9 @@ const useMetadataManagement = ( {
 				initialValues[ field.id ] =
 					document.metadata?.[ field.id ] ?? '';
 			} );
+
+			// Add title to initial values
+			initialValues.title = document.title ?? '';
 
 			// Add excerpt to initial values
 			initialValues.excerpt = document.excerpt ?? '';
@@ -232,7 +240,7 @@ const useMetadataManagement = ( {
 				[ documentId ]: newDoc,
 			};
 
-			// Check if any metadata or excerpt has changed
+			// Check if any metadata, excerpt, or title has changed
 			const hasChanges = Object.entries( newBulkMetadata ).some(
 				( [ docId, editedMetadata ] ) => {
 					const currentDoc = localDocuments.find(
@@ -241,6 +249,11 @@ const useMetadataManagement = ( {
 					if ( ! currentDoc ) {
 						return false;
 					}
+					// Check title
+					const originalTitle = currentDoc.title || '';
+					const isTitleChanged =
+						String( originalTitle ) !==
+						String( editedMetadata.title || '' );
 					// Check metadata fields
 					const metadataChanged = metadataFields.some( ( field ) => {
 						const originalValue =
@@ -255,7 +268,9 @@ const useMetadataManagement = ( {
 					const isExcerptChanged =
 						String( originalExcerpt ) !==
 						String( editedMetadata.excerpt || '' );
-					return metadataChanged || isExcerptChanged;
+					return (
+						isTitleChanged || metadataChanged || isExcerptChanged
+					);
 				}
 			);
 
@@ -306,13 +321,16 @@ const useMetadataManagement = ( {
 		dispatch( { type: 'SET_IS_SAVING', payload: true } );
 
 		try {
-			// Separate metadata and excerpt for different endpoints
+			// Separate metadata, excerpt, and title for different endpoints
 			const metadataToUpdate = {};
+			const titleChanged =
+				String( editingMetadata.title || '' ) !==
+				String( editedValues.title || '' );
 			const excerptChanged =
 				String( editingMetadata.excerpt || '' ) !==
 				String( editedValues.excerpt || '' );
 
-			// Only include metadata fields (not excerpt)
+			// Only include metadata fields (not excerpt or title)
 			metadataFields.forEach( ( field ) => {
 				const currentValue =
 					editingMetadata.metadata?.[ field.id ] || '';
@@ -324,6 +342,28 @@ const useMetadataManagement = ( {
 
 			// Prepare API calls
 			const calls = [];
+			const putData = {};
+
+			// Update title if it changed
+			if ( titleChanged ) {
+				putData.title = editedValues.title;
+			}
+
+			// Update excerpt if it changed
+			if ( excerptChanged ) {
+				putData.excerpt = editedValues.excerpt;
+			}
+
+			// Make PUT request if title or excerpt changed
+			if ( Object.keys( putData ).length > 0 ) {
+				calls.push(
+					apiFetch( {
+						path: `/${ apiNamespace }/documents/${ editingMetadata.id }`,
+						method: 'PUT',
+						data: putData,
+					} )
+				);
+			}
 
 			// Update metadata if there are changes
 			if ( Object.keys( metadataToUpdate ).length > 0 ) {
@@ -332,17 +372,6 @@ const useMetadataManagement = ( {
 						path: `/${ apiNamespace }/documents/${ editingMetadata.id }/metadata`,
 						method: 'POST',
 						data: metadataToUpdate,
-					} )
-				);
-			}
-
-			// Update excerpt if it changed
-			if ( excerptChanged ) {
-				calls.push(
-					apiFetch( {
-						path: `/${ apiNamespace }/documents/${ editingMetadata.id }`,
-						method: 'PUT',
-						data: { excerpt: editedValues.excerpt },
 					} )
 				);
 			}
@@ -356,6 +385,9 @@ const useMetadataManagement = ( {
 					doc.id === editingMetadata.id
 						? {
 								...doc,
+								title: titleChanged
+									? editedValues.title
+									: doc.title,
 								metadata: {
 									...doc.metadata,
 									...metadataToUpdate,
@@ -375,6 +407,9 @@ const useMetadataManagement = ( {
 						doc.id === editingMetadata.id
 							? {
 									...doc,
+									title: titleChanged
+										? editedValues.title
+										: doc.title,
 									metadata: {
 										...doc.metadata,
 										...metadataToUpdate,
@@ -466,13 +501,18 @@ const useMetadataManagement = ( {
 		dispatch( { type: 'SET_IS_SAVING_BULK', payload: true } );
 
 		try {
-			// Only send updates for documents with actual changes (metadata or excerpt)
+			// Only send updates for documents with actual changes (title, metadata, or excerpt)
 			const docsToUpdate = Object.entries( bulkEditedMetadata ).filter(
 				( [ docId, edited ] ) => {
 					const original = localDocuments.find(
 						( doc ) => doc.id.toString() === docId
 					);
 					if ( ! original ) return false;
+					// Check title
+					const origTitle = original.title ?? '';
+					const editTitle = edited.title ?? '';
+					const titleChanged =
+						String( origTitle ) !== String( editTitle );
 					// Check metadata fields
 					const metadataChanged = metadataFields.some( ( field ) => {
 						const origVal = original.metadata?.[ field.id ] ?? '';
@@ -484,7 +524,7 @@ const useMetadataManagement = ( {
 					const editExcerpt = edited.excerpt ?? '';
 					const excerptChanged =
 						String( origExcerpt ) !== String( editExcerpt );
-					return metadataChanged || excerptChanged;
+					return titleChanged || metadataChanged || excerptChanged;
 				}
 			);
 
@@ -502,12 +542,37 @@ const useMetadataManagement = ( {
 					}
 				} );
 
+				const titleChanged =
+					String( original.title ?? '' ) !==
+					String( edited.title ?? '' );
 				const excerptChanged =
 					String( original.excerpt ?? '' ) !==
 					String( edited.excerpt ?? '' );
 
 				// Prepare API calls with document ID tracking
 				const calls = [];
+				const putData = {};
+
+				if ( titleChanged ) {
+					putData.title = edited.title;
+				}
+				if ( excerptChanged ) {
+					putData.excerpt = edited.excerpt;
+				}
+
+				if ( Object.keys( putData ).length > 0 ) {
+					calls.push(
+						apiFetch( {
+							path: `/${ apiNamespace }/documents/${ docId }`,
+							method: 'PUT',
+							data: putData,
+						} ).then( ( result ) => ( {
+							type: 'document',
+							docId,
+							result,
+						} ) )
+					);
+				}
 
 				if ( Object.keys( metaDataToUpdate ).length > 0 ) {
 					calls.push(
@@ -517,20 +582,6 @@ const useMetadataManagement = ( {
 							data: metaDataToUpdate,
 						} ).then( ( result ) => ( {
 							type: 'metadata',
-							docId,
-							result,
-						} ) )
-					);
-				}
-
-				if ( excerptChanged ) {
-					calls.push(
-						apiFetch( {
-							path: `/${ apiNamespace }/documents/${ docId }`,
-							method: 'PUT',
-							data: { excerpt: edited.excerpt },
-						} ).then( ( result ) => ( {
-							type: 'excerpt',
 							docId,
 							result,
 						} ) )
