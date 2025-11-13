@@ -63,7 +63,7 @@ class DocumentPostType {
                 'items_list_navigation' => sprintf( '%s list navigation', $label ),
                 'items_list'            => sprintf( '%s list', $label ),
             ],
-            'supports'            => [ 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'custom-fields' ],
+            'supports'            => [ 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'custom-fields', 'revisions' ],
             'hierarchical'        => false,
             'public'              => true,
             'show_ui'             => true,
@@ -86,8 +86,11 @@ class DocumentPostType {
         // Register metadata fields for REST API.
         $this->register_metadata_fields();
 
-        // Hide document attachments from media library.
+        // Manage document attachments.
         add_filter( 'ajax_query_attachments_args', [ $this, 'hide_document_attachments' ] );
+        add_action( 'pre_get_posts', [ $this, 'hide_document_attachments_admin' ] );
+        add_action( 'before_delete_post', [ $this, 'delete_document_attachments' ] );
+        add_action( 'wp_restore_post_revision', [ $this, 'handle_revision_restore' ], 10, 2 );
     }
 
     /**
@@ -126,6 +129,33 @@ class DocumentPostType {
         foreach ( $standard_fields as $field_id => $schema ) {
             register_post_meta( $post_type, $field_id, $schema );
         }
+
+        // Track current attachment.
+        register_post_meta(
+            $post_type,
+            'document_file_id',
+            [
+				'show_in_rest' => true,
+				'single'       => true,
+				'type'         => 'integer',
+			]
+        );
+
+        // Track previous versions.
+        register_post_meta(
+            $post_type,
+            'document_file_versions',
+            [
+				'single'       => true,
+				'type'         => 'array',
+				'show_in_rest' => [
+					'schema' => [
+						'type'  => 'array',
+						'items' => [ 'type' => 'integer' ],
+					],
+				],
+			]
+        );
     }
 
     /**
@@ -182,7 +212,7 @@ class DocumentPostType {
 						'query_var'         => false,
 						'rewrite'           => false,
 						'show_in_rest'      => true,
-						'meta_box_cb'       => false, // We'll handle the UI ourselves.
+						'meta_box_cb'       => false,
 					]
                 );
 
@@ -265,39 +295,186 @@ class DocumentPostType {
     }
 
     /**
-     * Hide document attachments from the media library.
+     * Hide document-related attachments from the media modal (AJAX queries).
      *
      * @param array $query The query arguments.
      * @return array Modified query arguments.
      */
     public function hide_document_attachments( $query ): array {
-        // Get all document post IDs.
+        $attachment_ids = $this->get_document_attachment_ids();
+
+        if ( ! empty( $attachment_ids ) ) {
+            $query['post__not_in'] = isset( $query['post__not_in'] )
+                ? array_merge( $query['post__not_in'], $attachment_ids )
+                : $attachment_ids;
+        }
+
+        return $query;
+    }
+
+    /**
+     * Hide document-related attachments from the Media Library list view.
+     *
+     * @param \WP_Query $query The current admin query object.
+     * @return void
+     */
+    public function hide_document_attachments_admin( $query ): void {
+        if ( ! is_admin() || 'attachment' !== $query->get( 'post_type' ) ) {
+            return;
+        }
+
+        $attachment_ids = $this->get_document_attachment_ids();
+
+        if ( ! empty( $attachment_ids ) ) {
+            $query->set( 'post__not_in', $attachment_ids );
+        }
+    }
+
+    /**
+     * Get all attachment IDs associated with documents.
+     *
+     * @param bool $current_only If true, only return current document attachments; otherwise include previous versions.
+     * @return int[]
+     */
+    private function get_document_attachment_ids( bool $current_only = false ): array {
         $document_ids = get_posts(
             [
 				'post_type'      => $this->config->get_post_type(),
 				'fields'         => 'ids',
 				'posts_per_page' => -1,
-                'post_status'    => [ 'publish', 'draft', 'pending', 'private', 'trash' ],
+				'post_status'    => [ 'publish','draft','pending','private','trash' ],
 			]
         );
 
-        if ( ! empty( $document_ids ) ) {
-            // Get all attachment IDs associated with documents.
-            $attachment_ids = [];
-            foreach ( $document_ids as $doc_id ) {
-                $file_id = get_post_meta( $doc_id, 'document_file_id', true );
-                if ( $file_id ) {
-                    $attachment_ids[] = $file_id;
-                }
+        if ( empty( $document_ids ) ) {
+            return [];
+        }
+
+        $attachment_ids = [];
+
+        foreach ( $document_ids as $doc_id ) {
+            // Current attachment.
+            $file_id = get_post_meta( $doc_id, 'document_file_id', true );
+            if ( $file_id ) {
+                $attachment_ids[] = (int) $file_id;
             }
 
-            if ( ! empty( $attachment_ids ) ) {
-                $query['post__not_in'] = isset( $query['post__not_in'] )
-                    ? array_merge( $query['post__not_in'], $attachment_ids )
-                    : $attachment_ids;
+            // Previous versions.
+            if ( ! $current_only ) {
+                $versions = get_post_meta( $doc_id, 'document_file_versions', true );
+                if ( is_array( $versions ) ) {
+                    foreach ( $versions as $v_id ) {
+                        $attachment_ids[] = (int) $v_id;
+                    }
+                }
             }
         }
 
-        return $query;
+        return array_unique( $attachment_ids );
+    }
+
+	/**
+	 * Handle restoring a document revision and safely clean up newer attachments and revisions.
+	 *
+	 * When a revision is restored:
+	 *   1. Attachments belonging to newer revisions (created after the restored revision)
+	 *      are deleted if they are not referenced by the restored revision.
+	 *   2. Newer revisions themselves are deleted.
+	 *   3. Attachments and version history of the restored revision are preserved.
+	 *
+	 * This prevents orphaned attachments in the media library while keeping the restored revision intact.
+	 *
+	 * @param int $post_id     The ID of the post being restored.
+	 * @param int $revision_id The ID of the revision being restored.
+	 */
+	public function handle_revision_restore( int $post_id, int $revision_id ): void {
+		if ( get_post_type( $post_id ) !== $this->config->get_post_type() ) {
+			return;
+		}
+
+		// Meta from the revision being restored.
+		$revision_file_id  = (int) get_metadata( 'post', $revision_id, 'document_file_id', true );
+		$revision_versions = get_metadata( 'post', $revision_id, 'document_file_versions', true );
+		$revision_versions = is_array( $revision_versions ) ? array_map( 'intval', $revision_versions ) : [];
+
+		// Build "keep" list: restored revision's file and its versions.
+		$keep_ids = array_filter( array_unique( array_map( 'intval', array_merge( [ $revision_file_id ], $revision_versions ) ) ) );
+
+		// Get all revisions of the post.
+		$revisions = wp_get_post_revisions( $post_id );
+		$to_delete = [];
+
+		foreach ( $revisions as $rev ) {
+			if ( $rev->ID <= $revision_id ) {
+				continue;
+			}
+
+			// Collect all attachment IDs from this newer revision.
+			$file_id  = (int) get_metadata( 'post', $rev->ID, 'document_file_id', true );
+			$versions = get_metadata( 'post', $rev->ID, 'document_file_versions', true );
+			$versions = is_array( $versions ) ? array_map( 'intval', $versions ) : [];
+
+			$all_ids = array_filter( array_unique( array_merge( [ $file_id ], $versions ) ) );
+			foreach ( $all_ids as $aid ) {
+				// Only delete IDs that aren't part of the keep list.
+				if ( $aid && ! in_array( $aid, $keep_ids, true ) ) {
+					$to_delete[] = (int) $aid;
+				}
+			}
+
+			// Delete the newer revision itself.
+			wp_delete_post_revision( $rev->ID );
+		}
+
+		// Delete only orphaned attachments (unique, normalized ints).
+		$to_delete = array_unique( array_map( 'intval', $to_delete ) );
+		foreach ( $to_delete as $aid ) {
+			if ( $aid && get_post( $aid ) ) {
+				wp_delete_attachment( $aid, true );
+			}
+		}
+
+		// Restore the restored revision's meta safely.
+		update_post_meta( $post_id, 'document_file_id', $revision_file_id );
+		update_post_meta( $post_id, 'document_file_versions', $revision_versions );
+	}
+
+
+    /**
+     * Delete all attachments associated with a document, including old revisions.
+     *
+     * Triggered by before_delete_post to remove both the current and any
+     * versioned attachments stored in document_file_versions.
+     *
+     * @param int $post_id The document post ID being deleted.
+     */
+    public function delete_document_attachments( int $post_id ): void {
+        if ( get_post_type( $post_id ) !== $this->config->get_post_type() ) {
+            return;
+        }
+
+        $attachment_ids = [];
+
+        $current_id = (int) get_post_meta( $post_id, 'document_file_id', true );
+        if ( $current_id ) {
+            $attachment_ids[] = $current_id;
+        }
+
+        $versions = get_post_meta( $post_id, 'document_file_versions', true );
+        if ( is_array( $versions ) ) {
+            $attachment_ids = array_merge( $attachment_ids, array_map( 'intval', $versions ) );
+        }
+
+        $attachment_ids = array_unique( array_filter( $attachment_ids ) );
+
+        foreach ( $attachment_ids as $aid ) {
+            if ( get_post( $aid ) ) {
+                wp_delete_attachment( $aid, true );
+            }
+        }
+
+        // Clean meta.
+        delete_post_meta( $post_id, 'document_file_versions' );
+        delete_post_meta( $post_id, 'document_file_id' );
     }
 }
