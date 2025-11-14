@@ -410,7 +410,26 @@ class DocumentUploader {
      * @return \WP_Post|null Duplicate post or null if none found.
      */
     private function check_for_duplicate( string $title ) {
-        $query = new \WP_Query(
+        // First try to find a post by the sanitized slug (post_name). This
+        // ensures that if the title was changed but the slug was preserved,
+        // we still recognise the existing document and create a new version
+        // rather than a new document post.
+        $slug_query = new \WP_Query(
+            [
+                'post_type'      => $this->config->get_post_type(),
+                'post_status'    => 'publish',
+                'name'           => sanitize_title( $title ),
+                'posts_per_page' => 1,
+                'fields'         => 'ids',
+            ]
+        );
+
+        if ( $slug_query->have_posts() ) {
+            return get_post( $slug_query->posts[0] );
+        }
+
+        // Fallback: check by title (legacy behaviour).
+        $title_query = new \WP_Query(
             [
                 'post_type'      => $this->config->get_post_type(),
                 'post_status'    => 'publish',
@@ -420,8 +439,8 @@ class DocumentUploader {
             ]
         );
 
-        if ( $query->have_posts() ) {
-            return get_post( $query->posts[0] );
+        if ( $title_query->have_posts() ) {
+            return get_post( $title_query->posts[0] );
         }
 
         return null;
