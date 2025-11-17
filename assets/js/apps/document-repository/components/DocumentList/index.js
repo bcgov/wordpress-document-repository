@@ -660,6 +660,24 @@ const DocumentList = ( {
 						saveButtonClassName="doc-repo-button save-button"
 					>
 						<div className="editable-metadata">
+							{ /* Title field */ }
+							<div className="metadata-field">
+								<label htmlFor="title">
+									{ __( 'Title', 'bcgov-design-system' ) }
+								</label>
+								<TextControl
+									id="title"
+									value={ editedValues.title || '' }
+									onChange={ ( value ) => {
+										updateEditedField( 'title', value );
+									} }
+									placeholder={ __(
+										'Enter title…',
+										'bcgov-design-system'
+									) }
+								/>
+							</div>
+
 							{ /* Excerpt field */ }
 							<div className="metadata-field">
 								<label htmlFor="excerpt">

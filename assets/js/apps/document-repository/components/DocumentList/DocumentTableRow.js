@@ -247,7 +247,26 @@ function DocumentTableRow( {
 
 			{ /* Document title cell */ }
 			<div className="document-table-cell" role="cell">
-				{ document.title || document.filename }
+				{ isSpreadsheetMode ? (
+					<TextControl
+						value={
+							typeof bulkEditedMetadata?.[ document.id ]
+								?.title !== 'undefined'
+								? bulkEditedMetadata[ document.id ].title
+								: document.title || ''
+						}
+						onChange={ ( newValue ) => {
+							onMetadataChange( document.id, 'title', newValue );
+						} }
+						placeholder={ __(
+							'Enter title…',
+							'bcgov-design-system'
+						) }
+						className="title-input"
+					/>
+				) : (
+					document.title || document.filename
+				) }
 			</div>
 
 			{ /* Excerpt cell */ }
