@@ -3,6 +3,7 @@ import {
 	SelectControl,
 	TextareaControl,
 	Notice,
+	CheckboxControl,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
@@ -99,15 +100,30 @@ const MetadataFieldForm = ( {
 			) }
 
 			{ field.type === 'taxonomy' && (
-				<TextareaControl
-					label={ __( 'Taxonomy Terms', 'bcgov-design-system' ) }
-					value={ formatOptionsToString( field ) }
-					onChange={ onOptionsChange }
-					help={ __(
-						'Enter one taxonomy term per line. These will become the available options for this taxonomy.',
-						'bcgov-design-system'
-					) }
-				/>
+				<>
+					<TextareaControl
+						label={ __( 'Taxonomy Terms', 'bcgov-design-system' ) }
+						value={ formatOptionsToString( field ) }
+						onChange={ onOptionsChange }
+						help={ __(
+							'Enter one taxonomy term per line. These will become the available options for this taxonomy.',
+							'bcgov-design-system'
+						) }
+					/>
+
+					{ /* Multiple choice toggle for taxonomy fields */ }
+					<CheckboxControl
+						label={ __( 'Multiple choice', 'bcgov-design-system' ) }
+						help={ __(
+							'Allow selecting multiple terms for this field',
+							'bcgov-design-system'
+						) }
+						checked={ !! field.multiple }
+						onChange={ ( checked ) =>
+							onChange( 'multiple', checked )
+						}
+					/>
+				</>
 			) }
 
 			<TextareaControl

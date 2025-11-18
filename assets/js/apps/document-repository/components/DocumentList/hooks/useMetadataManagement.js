@@ -152,9 +152,12 @@ const useMetadataManagement = ( {
 
 		// Check metadata fields
 		const metadataChanged = metadataFields.some( ( field ) => {
-			const currentValue = editingMetadata.metadata?.[ field.id ] || '';
-			const editedValue = editedValues[ field.id ] || '';
-			return currentValue !== editedValue;
+			const currentValue = editingMetadata.metadata?.[ field.id ] ?? '';
+			const editedValue = editedValues[ field.id ] ?? '';
+			// Use JSON stringify to compare arrays/objects reliably.
+			return (
+				JSON.stringify( currentValue ) !== JSON.stringify( editedValue )
+			);
 		} );
 
 		// Check title
@@ -191,10 +194,28 @@ const useMetadataManagement = ( {
 			};
 
 			// Initialize edited values with current metadata, preserving case
+			// For taxonomy fields marked `multiple`, coerce stored values into
+			// an array so the UI (token fields / multi-select) always receives
+			// a consistent array shape. This avoids type surprises when
+			// comparing and saving values.
 			const initialValues = {};
 			metadataFields.forEach( ( field ) => {
-				initialValues[ field.id ] =
-					document.metadata?.[ field.id ] ?? '';
+				// If taxonomy and marked multiselect, coerce to array
+				if ( field.type === 'taxonomy' && field.multiple ) {
+					const val = document.metadata?.[ field.id ];
+					let coerced;
+					if ( Array.isArray( val ) ) {
+						coerced = val;
+					} else if ( val ) {
+						coerced = [ val ];
+					} else {
+						coerced = [];
+					}
+					initialValues[ field.id ] = coerced;
+				} else {
+					initialValues[ field.id ] =
+						document.metadata?.[ field.id ] ?? '';
+				}
 			} );
 
 			// Add title to initial values
@@ -240,7 +261,7 @@ const useMetadataManagement = ( {
 				[ documentId ]: newDoc,
 			};
 
-			// Check if any metadata, excerpt, or title has changed
+			// Check if any metadata, excerpt, title, or multiple-selection has changed
 			const hasChanges = Object.entries( newBulkMetadata ).some(
 				( [ docId, editedMetadata ] ) => {
 					const currentDoc = localDocuments.find(
@@ -257,11 +278,12 @@ const useMetadataManagement = ( {
 					// Check metadata fields
 					const metadataChanged = metadataFields.some( ( field ) => {
 						const originalValue =
-							currentDoc.metadata?.[ field.id ] || '';
-						const isChanged =
-							String( originalValue ) !==
-							String( editedMetadata[ field.id ] || '' );
-						return isChanged;
+							currentDoc.metadata?.[ field.id ] ?? '';
+						const editedValue = editedMetadata[ field.id ] ?? '';
+						return (
+							JSON.stringify( originalValue ) !==
+							JSON.stringify( editedValue )
+						);
 					} );
 					// Check excerpt
 					const originalExcerpt = currentDoc.excerpt || '';
@@ -333,9 +355,12 @@ const useMetadataManagement = ( {
 			// Only include metadata fields (not excerpt or title)
 			metadataFields.forEach( ( field ) => {
 				const currentValue =
-					editingMetadata.metadata?.[ field.id ] || '';
-				const editedValue = editedValues[ field.id ] || '';
-				if ( String( currentValue ) !== String( editedValue ) ) {
+					editingMetadata.metadata?.[ field.id ] ?? '';
+				const editedValue = editedValues[ field.id ] ?? '';
+				if (
+					JSON.stringify( currentValue ) !==
+					JSON.stringify( editedValue )
+				) {
 					metadataToUpdate[ field.id ] = editedValue;
 				}
 			} );
@@ -517,7 +542,10 @@ const useMetadataManagement = ( {
 					const metadataChanged = metadataFields.some( ( field ) => {
 						const origVal = original.metadata?.[ field.id ] ?? '';
 						const editVal = edited[ field.id ] ?? '';
-						return String( origVal ) !== String( editVal );
+						return (
+							JSON.stringify( origVal ) !==
+							JSON.stringify( editVal )
+						);
 					} );
 					// Check excerpt
 					const origExcerpt = original.excerpt ?? '';
@@ -537,7 +565,9 @@ const useMetadataManagement = ( {
 				metadataFields.forEach( ( field ) => {
 					const origVal = original.metadata?.[ field.id ] ?? '';
 					const editVal = edited[ field.id ] ?? '';
-					if ( String( origVal ) !== String( editVal ) ) {
+					if (
+						JSON.stringify( origVal ) !== JSON.stringify( editVal )
+					) {
 						metaDataToUpdate[ field.id ] = editVal;
 					}
 				} );
