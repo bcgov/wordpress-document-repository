@@ -103,6 +103,7 @@ const MetadataApp = () => {
 						'type',
 						'description',
 						'_rawOptionsText',
+						'multiple',
 					];
 					if ( originalValues ) {
 						hasFieldChanges = fieldsToCompare.some(
@@ -293,6 +294,7 @@ const MetadataApp = () => {
 				_rawOptionsText:
 					field._rawOptionsText || formatOptionsToString( field ),
 				id: field.id || '',
+				multiple: !! field.multiple,
 			};
 
 			setState( ( prev ) => ( {

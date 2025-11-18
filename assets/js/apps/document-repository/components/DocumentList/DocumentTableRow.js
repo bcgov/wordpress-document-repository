@@ -4,6 +4,7 @@ import {
 	TextControl,
 	TextareaControl,
 	SelectControl,
+	FormTokenField,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import { isTrashView } from '../../utils/documentStatus';
@@ -69,19 +70,41 @@ function DocumentTableRow( {
 			bulkEditedMetadata[ document.id ]?.[ field.id ] || '';
 
 		if ( field.type === 'taxonomy' ) {
-			const options = ( field.options || [] ).map( ( option ) => {
+			const suggestions = ( field.options || [] ).map( ( option ) =>
 				// Handle both old format (string) and new format (object with id/name)
-				if ( typeof option === 'string' ) {
-					return {
-						label: option,
-						value: option,
-					};
+				typeof option === 'string'
+					? option
+					: option.label || option.name
+			);
+
+			if ( field.multiple ) {
+				let valueArray;
+				if ( Array.isArray( fieldValue ) ) {
+					valueArray = fieldValue;
+				} else if ( fieldValue ) {
+					valueArray = [ fieldValue ];
+				} else {
+					valueArray = [];
 				}
-				return {
-					label: option.label || option.name,
-					value: option.label || option.name,
-				};
-			} );
+				return (
+					<FormTokenField
+						value={ valueArray }
+						suggestions={ suggestions }
+						onChange={ ( tokens ) =>
+							onMetadataChange( document.id, field.id, tokens )
+						}
+						placeholder={ __(
+							'Add or select…',
+							'bcgov-design-system'
+						) }
+					/>
+				);
+			}
+
+			const options = suggestions.map( ( s ) => ( {
+				label: s,
+				value: s,
+			} ) );
 
 			return (
 				<SelectControl

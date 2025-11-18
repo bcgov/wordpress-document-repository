@@ -4,6 +4,7 @@ import {
 	SelectControl,
 	TextControl,
 	TextareaControl,
+	FormTokenField,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import ErrorBoundary from './ErrorBoundary';
@@ -16,11 +17,11 @@ import RetryNotice from './RetryNotice';
 import { isAllView, isTrashView } from '../../utils/documentStatus';
 
 // Import custom hooks
-import useNotifications from './hooks/useNotifications';
-import useErrorHandling from './hooks/useErrorHandling';
-import useMetadataManagement from './hooks/useMetadataManagement';
-import useFileHandling from './hooks/useFileHandling';
-import useDocumentManagement from './hooks/useDocumentManagement';
+import { default as useNotifications } from './hooks/useNotifications';
+import { default as useErrorHandling } from './hooks/useErrorHandling';
+import { default as useMetadataManagement } from './hooks/useMetadataManagement';
+import { default as useFileHandling } from './hooks/useFileHandling';
+import { default as useDocumentManagement } from './hooks/useDocumentManagement';
 
 /**
  * DocumentList Component
@@ -719,69 +720,125 @@ const DocumentList = ( {
 									<label htmlFor={ field.id }>
 										{ field.label }
 									</label>
-									{ field.type === 'taxonomy' ? (
-										<SelectControl
-											id={ field.id }
-											value={
-												editedValues[ field.id ] || ''
-											}
-											options={ [
-												{
-													label: __(
-														'Select…',
-														'bcgov-design-system'
-													),
-													value: '',
-												},
-												...( field.options || [] ).map(
-													( option ) => {
-														// Handle both old format (string) and new format (object with id/name)
-														if (
+									{ ( () => {
+										let inputElement = null;
+
+										if ( field.type === 'taxonomy' ) {
+											if ( field.multiple ) {
+												// Coerce edited value into an array for the token field.
+												let valueArray;
+												const raw =
+													editedValues[ field.id ];
+												if ( Array.isArray( raw ) ) {
+													valueArray = raw;
+												} else if ( raw ) {
+													valueArray = [ raw ];
+												} else {
+													valueArray = [];
+												}
+
+												inputElement = (
+													<FormTokenField
+														id={ field.id }
+														value={ valueArray }
+														suggestions={ (
+															field.options || []
+														).map( ( option ) =>
 															typeof option ===
 															'string'
-														) {
-															return {
-																label: option,
-																value: option,
-															};
+																? option
+																: option.label ||
+																  option.name
+														) }
+														onChange={ ( tokens ) =>
+															updateEditedField(
+																field.id,
+																tokens
+															)
 														}
-														return {
-															label:
-																option.label ||
-																option.name,
-															value:
-																option.value ||
-																option.id,
-														};
+														placeholder={ __(
+															'Add or select…',
+															'bcgov-design-system'
+														) }
+													/>
+												);
+											} else {
+												inputElement = (
+													<SelectControl
+														id={ field.id }
+														value={
+															editedValues[
+																field.id
+															] || ''
+														}
+														options={ [
+															{
+																label: __(
+																	'Select…',
+																	'bcgov-design-system'
+																),
+																value: '',
+															},
+															...(
+																field.options ||
+																[]
+															).map(
+																( option ) => {
+																	if (
+																		typeof option ===
+																		'string'
+																	) {
+																		return {
+																			label: option,
+																			value: option,
+																		};
+																	}
+																	return {
+																		label:
+																			option.label ||
+																			option.name,
+																		value:
+																			option.value ||
+																			option.id,
+																	};
+																}
+															),
+														] }
+														onChange={ ( value ) =>
+															updateEditedField(
+																field.id,
+																value
+															)
+														}
+													/>
+												);
+											}
+										} else {
+											inputElement = (
+												<TextControl
+													id={ field.id }
+													type={
+														field.type === 'date'
+															? 'date'
+															: 'text'
 													}
-												),
-											] }
-											onChange={ ( value ) =>
-												updateEditedField(
-													field.id,
-													value
-												)
-											}
-										/>
-									) : (
-										<TextControl
-											id={ field.id }
-											type={
-												field.type === 'date'
-													? 'date'
-													: 'text'
-											}
-											value={
-												editedValues[ field.id ] || ''
-											}
-											onChange={ ( value ) =>
-												updateEditedField(
-													field.id,
-													value
-												)
-											}
-										/>
-									) }
+													value={
+														editedValues[
+															field.id
+														] || ''
+													}
+													onChange={ ( value ) =>
+														updateEditedField(
+															field.id,
+															value
+														)
+													}
+												/>
+											);
+										}
+
+										return inputElement;
+									} )() }
 									{ metadataErrors[ field.id ] && (
 										<div className="metadata-error">
 											{ metadataErrors[ field.id ] }
