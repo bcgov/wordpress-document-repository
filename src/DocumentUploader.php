@@ -391,6 +391,7 @@ class DocumentUploader {
         return [
             'id'        => $post->ID,
             'title'     => $post->post_title,
+            'slug'      => $post->post_name,
             'date'      => $post->post_date,
             'author'    => get_the_author_meta( 'display_name', $post->post_author ),
             'excerpt'   => $post->post_excerpt,

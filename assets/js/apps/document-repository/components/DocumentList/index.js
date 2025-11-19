@@ -855,6 +855,22 @@ const DocumentList = ( {
 								) }
 							</h3>
 							<div className="metadata-field">
+								<label htmlFor="document-slug">
+									{ __(
+										'Document slug',
+										'bcgov-design-system'
+									) }
+								</label>
+								<div id="document-slug" className="field-value">
+									{ editingMetadata.slug ||
+										editingMetadata.post_name ||
+										__(
+											'Not available',
+											'bcgov-design-system'
+										) }
+								</div>
+							</div>
+							<div className="metadata-field">
 								<label htmlFor="document-filename">
 									{ __( 'Filename', 'bcgov-design-system' ) }
 								</label>
