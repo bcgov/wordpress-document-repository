@@ -427,6 +427,15 @@
 		text-overflow: clip;
 	}
 
+	// Excerpt cell specifically
+	.excerpt-cell {
+		min-width: 15rem;
+		max-width: none;
+		white-space: normal;
+		overflow: visible;
+		text-overflow: clip;
+	}
+
 	// Actions cell specifically
 	.document-table-cell:last-child {
 		width: 6rem;
