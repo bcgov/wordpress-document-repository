@@ -293,7 +293,7 @@ function DocumentTableRow( {
 			</div>
 
 			{ /* Excerpt cell */ }
-			<div className="document-table-cell" role="cell">
+			<div className="document-table-cell excerpt-cell" role="cell">
 				{ isSpreadsheetMode ? (
 					<TextareaControl
 						value={
