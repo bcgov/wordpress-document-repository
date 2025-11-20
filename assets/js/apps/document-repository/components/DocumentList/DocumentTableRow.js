@@ -332,7 +332,8 @@ function DocumentTableRow( {
 								typeof bulkEditedMetadata?.[ document.id ]
 									?.title !== 'undefined';
 							if ( hasBulkTitle ) {
-								return bulkEditedMetadata?.[ document.id ]?.title;
+								return bulkEditedMetadata?.[ document.id ]
+									?.title;
 							}
 							return document.title || '';
 						} )() }
