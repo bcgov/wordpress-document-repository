@@ -54,6 +54,7 @@ const App = () => {
 		totalPages,
 		statusCounts,
 		fetchDocuments,
+		fetchAllDocuments,
 		deleteDocument,
 		trashDocument,
 		restoreDocument,
@@ -61,6 +62,8 @@ const App = () => {
 		isLoading: isLoadingDocuments,
 		error: documentsError,
 		setSearchParams,
+		searchTerm,
+		setSearchTerm,
 	} = useDocuments();
 
 	// Initialize data on component mount
@@ -251,7 +254,7 @@ const App = () => {
 	/**
 	 * Debounced document fetch
 	 *
-	 * Prevents rapid consecutive calls to fetchDocuments by delaying execution
+	 * Prevents rapid consecutive calls to fetchAllDocuments by delaying execution
 	 * until 1 second has passed without additional calls. Useful after bulk uploads
 	 * to avoid overloading the server and reduce timeout risk.
 	 *
@@ -261,9 +264,14 @@ const App = () => {
 		let timer;
 		return ( ...args ) => {
 			clearTimeout( timer );
-			timer = setTimeout( () => fetchDocuments( ...args ), 1000 );
+			timer = setTimeout( () => {
+				// Refresh cache after upload to include new documents
+				if ( fetchAllDocuments ) {
+					fetchAllDocuments( ...args );
+				}
+			}, 1000 );
 		};
-	}, [ fetchDocuments ] );
+	}, [ fetchAllDocuments ] );
 
 	/**
 	 * Handle upload success and move to next file
@@ -456,6 +464,8 @@ const App = () => {
 					statusCounts={ statusCounts }
 					documentStatusFilter={ documentStatusFilter }
 					onStatusFilterChange={ setDocumentStatusFilter }
+					searchTerm={ searchTerm }
+					onSearchChange={ setSearchTerm }
 				/>
 
 				{ /* Upload Modal */ }

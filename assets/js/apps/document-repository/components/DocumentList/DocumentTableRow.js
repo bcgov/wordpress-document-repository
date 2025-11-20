@@ -8,6 +8,7 @@ import {
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import { isTrashView } from '../../utils/documentStatus';
+import { highlightSearchTerm } from '../../utils/searchUtils';
 
 /**
  * DocumentTableRow Component
@@ -29,6 +30,7 @@ import { isTrashView } from '../../utils/documentStatus';
  * @param {Function} props.onMetadataChange     - Callback when metadata is changed in spreadsheet mode
  * @param {Function} props.formatFileSize       - Function to format file size for display
  * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
+ * @param {string}   props.searchTerm           - Current search term for highlighting
  * @return {JSX.Element} Rendered document table row
  */
 function DocumentTableRow( {
@@ -45,7 +47,56 @@ function DocumentTableRow( {
 	onMetadataChange,
 	formatFileSize,
 	documentStatusFilter,
+	searchTerm = '',
 } ) {
+	/**
+	 * Render excerpt cell content
+	 * @return {JSX.Element|string} Excerpt content
+	 */
+	const renderExcerpt = () => {
+		if ( isSpreadsheetMode ) {
+			return (
+				<TextareaControl
+					value={ ( () => {
+						const hasBulkEdit =
+							typeof bulkEditedMetadata?.[ document.id ]
+								?.excerpt !== 'undefined';
+						if ( hasBulkEdit ) {
+							return bulkEditedMetadata[ document.id ].excerpt;
+						}
+						return document.excerpt || '';
+					} )() }
+					onChange={ ( newValue ) => {
+						onMetadataChange( document.id, 'excerpt', newValue );
+						// Auto-resize the textarea
+						setTimeout( () => {
+							const textarea = document.querySelector(
+								`[data-document-id="${ document.id }"] textarea`
+							);
+							if ( textarea ) {
+								textarea.style.height = 'auto';
+								textarea.style.height =
+									textarea.scrollHeight + 'px';
+							}
+						}, 0 );
+					} }
+					placeholder={ __(
+						'Enter excerpt…',
+						'bcgov-design-system'
+					) }
+					rows={ 2 }
+					className="excerpt-textarea"
+				/>
+			);
+		}
+
+		if ( document.excerpt ) {
+			return highlightSearchTerm( document.excerpt, searchTerm );
+		}
+
+		return '—';
+	};
+
 	const renderMetadataField = ( field ) => {
 		if ( ! isSpreadsheetMode ) {
 			const fieldValue =
@@ -60,10 +111,14 @@ function DocumentTableRow( {
 					? fieldValue
 					: [ fieldValue ];
 				// Return single value or comma-separated for multiple
-				return values.length === 1 ? values[ 0 ] : values.join( ', ' );
+				const displayValue =
+					values.length === 1 ? values[ 0 ] : values.join( ', ' );
+				return highlightSearchTerm( displayValue, searchTerm );
 			}
 
-			return fieldValue || '—';
+			return fieldValue
+				? highlightSearchTerm( fieldValue, searchTerm )
+				: '—';
 		}
 
 		const fieldValue =
@@ -272,12 +327,15 @@ function DocumentTableRow( {
 			<div className="document-table-cell" role="cell">
 				{ isSpreadsheetMode ? (
 					<TextControl
-						value={
-							typeof bulkEditedMetadata?.[ document.id ]
-								?.title !== 'undefined'
-								? bulkEditedMetadata[ document.id ].title
-								: document.title || ''
-						}
+						value={ ( () => {
+							const hasBulkTitle =
+								typeof bulkEditedMetadata?.[ document.id ]
+									?.title !== 'undefined';
+							if ( hasBulkTitle ) {
+								return bulkEditedMetadata[ document.id ].title;
+							}
+							return document.title || '';
+						} )() }
 						onChange={ ( newValue ) => {
 							onMetadataChange( document.id, 'title', newValue );
 						} }
@@ -288,48 +346,16 @@ function DocumentTableRow( {
 						className="title-input"
 					/>
 				) : (
-					document.title || document.filename
+					highlightSearchTerm(
+						document.title || document.filename,
+						searchTerm
+					)
 				) }
 			</div>
 
 			{ /* Excerpt cell */ }
 			<div className="document-table-cell excerpt-cell" role="cell">
-				{ isSpreadsheetMode ? (
-					<TextareaControl
-						value={
-							typeof bulkEditedMetadata?.[ document.id ]
-								?.excerpt !== 'undefined'
-								? bulkEditedMetadata[ document.id ].excerpt
-								: document.excerpt || ''
-						}
-						onChange={ ( newValue ) => {
-							onMetadataChange(
-								document.id,
-								'excerpt',
-								newValue
-							);
-							// Auto-resize the textarea
-							setTimeout( () => {
-								const textarea = document.querySelector(
-									`[data-document-id="${ document.id }"] textarea`
-								);
-								if ( textarea ) {
-									textarea.style.height = 'auto';
-									textarea.style.height =
-										textarea.scrollHeight + 'px';
-								}
-							}, 0 );
-						} }
-						placeholder={ __(
-							'Enter excerpt…',
-							'bcgov-design-system'
-						) }
-						rows={ 2 }
-						className="excerpt-textarea"
-					/>
-				) : (
-					document.excerpt || '—'
-				) }
+				{ renderExcerpt() }
 			</div>
 
 			{ /* Metadata cells - dynamically rendered based on metadata fields */ }

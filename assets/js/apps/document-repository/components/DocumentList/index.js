@@ -47,6 +47,8 @@ import { default as useDocumentManagement } from './hooks/useDocumentManagement'
  * @param {Array}    props.statusCounts         - Array of number of documents of each status
  * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
  * @param {Function} props.onStatusFilterChange - Callback when filter changes
+ * @param {string}   props.searchTerm           - Current search term
+ * @param {Function} props.onSearchChange       - Callback when search term changes
  */
 const DocumentList = ( {
 	documents = [],
@@ -66,6 +68,8 @@ const DocumentList = ( {
 	statusCounts = {},
 	documentStatusFilter = 'all',
 	onStatusFilterChange,
+	searchTerm = '',
+	onSearchChange,
 } ) => {
 	// Memoize formatFileSize function
 	const formatFileSize = useMemo(
@@ -199,6 +203,13 @@ const DocumentList = ( {
 			onMetadataChange: handleMetadataChange,
 			formatFileSize,
 			documentStatusFilter,
+			searchTerm,
+			onSearchChange,
+			onPageChange,
+			toggleSpreadsheetMode,
+			hasMetadataChanges,
+			handleSaveBulkChanges,
+			isSavingBulk,
 		} ),
 		[
 			localDocuments,
@@ -215,6 +226,13 @@ const DocumentList = ( {
 			setDeleteDocument,
 			setRestoreDocument,
 			documentStatusFilter,
+			searchTerm,
+			onSearchChange,
+			onPageChange,
+			toggleSpreadsheetMode,
+			hasMetadataChanges,
+			handleSaveBulkChanges,
+			isSavingBulk,
 		]
 	);
 
@@ -328,42 +346,6 @@ const DocumentList = ( {
 
 				<div className="document-list__table-actions">
 					<div className="action-buttons-container">
-						<Button
-							className={ `doc-repo-button spreadsheet-toggle${
-								isSpreadsheetMode ? ' isPressed' : ''
-							}` }
-							onClick={ () =>
-								toggleSpreadsheetMode( ! isSpreadsheetMode )
-							}
-							isPressed={ isSpreadsheetMode }
-						>
-							{ isSpreadsheetMode
-								? __(
-										'Exit Spreadsheet Mode',
-										'bcgov-design-system'
-								  )
-								: __(
-										'Enter Spreadsheet Mode',
-										'bcgov-design-system'
-								  ) }
-						</Button>
-
-						{ isSpreadsheetMode && hasMetadataChanges && (
-							<Button
-								className="doc-repo-button save-button"
-								onClick={ handleSaveBulkChanges }
-								isBusy={ isSavingBulk }
-								disabled={ isSavingBulk }
-							>
-								{ isSavingBulk
-									? __( 'Saving…', 'bcgov-design-system' )
-									: __(
-											'Save Changes',
-											'bcgov-design-system'
-									  ) }
-							</Button>
-						) }
-
 						{ isTrashView( documentStatusFilter ) &&
 							selectedDocuments.length > 0 && (
 								<Button
