@@ -62,7 +62,7 @@ function DocumentTableRow( {
 							typeof bulkEditedMetadata?.[ document.id ]
 								?.excerpt !== 'undefined';
 						if ( hasBulkEdit ) {
-							return bulkEditedMetadata[ document.id ].excerpt;
+							return bulkEditedMetadata?.[ document.id ]?.excerpt;
 						}
 						return document.excerpt || '';
 					} )() }
@@ -70,7 +70,7 @@ function DocumentTableRow( {
 						onMetadataChange( document.id, 'excerpt', newValue );
 						// Auto-resize the textarea
 						setTimeout( () => {
-							const textarea = document.querySelector(
+							const textarea = window.document.querySelector(
 								`[data-document-id="${ document.id }"] textarea`
 							);
 							if ( textarea ) {
@@ -122,7 +122,7 @@ function DocumentTableRow( {
 		}
 
 		const fieldValue =
-			bulkEditedMetadata[ document.id ]?.[ field.id ] || '';
+			bulkEditedMetadata?.[ document.id ]?.[ field.id ] || '';
 
 		if ( field.type === 'taxonomy' ) {
 			const suggestions = ( field.options || [] ).map( ( option ) =>
@@ -332,7 +332,7 @@ function DocumentTableRow( {
 								typeof bulkEditedMetadata?.[ document.id ]
 									?.title !== 'undefined';
 							if ( hasBulkTitle ) {
-								return bulkEditedMetadata[ document.id ].title;
+								return bulkEditedMetadata?.[ document.id ]?.title;
 							}
 							return document.title || '';
 						} )() }
