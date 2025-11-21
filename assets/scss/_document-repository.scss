@@ -377,6 +377,10 @@
 		vertical-align: middle;
 		overflow: visible;
 		text-overflow: clip;
+
+		&.document-table__search-cell {
+			overflow: visible;
+		}
 		white-space: normal;
 
 		&.header {

@@ -1,50 +1,64 @@
 /**
- * Custom hook for managing document data and operations
+ * useDocuments
  *
- * Provides a centralized way to manage document-related state and operations
- * including fetching, updating, and deleting documents. Handles pagination,
- * loading states, and error handling.
+ * High-performance React hook for the Document Repository admin interface.
+ * Features instant client-side search, accurate tab counts (All / Trash / etc.),
+ * full support for trash/restore/permanent delete, and zero unnecessary API calls.
  *
- * @module useDocuments
- * @return {Object} Document management utilities and state
- * @property {Array}       documents           - List of documents
- * @property {number}      totalDocuments      - Total number of documents
- * @property {number}      currentPage         - Current page number
- * @property {number}      totalPages          - Total number of pages
- * @property {boolean}     isLoading           - Loading state flag
- * @property {boolean}     isDeleting          - Deletion in progress flag
- * @property {string|null} error               - Error message if any
- * @property {Object}      searchParams        - Current search parameters
- * @property {Function}    setSearchParams     - Update search parameters
- * @property {Function}    fetchDocuments      - Fetch documents from API
- * @property {Function}    deleteDocument      - Delete a single document
- * @property {Function}    updateDocument      - Update a single document
- * @property {Function}    bulkUpdateDocuments - Update multiple documents
- * @property {Function}    bulkDeleteDocuments - Delete multiple documents
+ * @return {Object} Hook return value
+ * @return {Array} return.documents - Current page of documents after filtering, sorting, and pagination
+ * @return {number} return.totalDocuments - Total number of documents after filtering
+ * @return {number} return.currentPage - Current page number (1-indexed)
+ * @return {number} return.totalPages - Total number of pages
+ * @return {Object} return.statusCounts - Status counts for tabs: { all: number, trash: number, ... }
+ * @return {boolean} return.isLoading - Whether documents are currently being fetched
+ * @return {boolean} return.isDeleting - Whether a delete/trash/restore operation is in progress
+ * @return {string|null} return.error - Error message if an operation failed
+ * @return {string} return.searchTerm - Current search term for client-side filtering
+ * @return {Function} return.setSearchTerm - Setter for search term
+ * @return {Object} return.searchParams - Search parameters: { page, per_page, orderby, order, status }
+ * @return {Function} return.setSearchParams - Setter for search parameters
+ * @return {Function} return.fetchDocuments - Refresh documents and status counts
+ * @return {Function} return.deleteDocument - Permanently delete a document
+ * @return {Function} return.trashDocument - Move a document to trash
+ * @return {Function} return.restoreDocument - Restore a document from trash
  */
-
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import {
+	useState,
+	useEffect,
+	useCallback,
+	useMemo,
+	useRef,
+} from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 
-/**
- * Hook to manage document data and operations
- *
- * @return {Object} Document data and operations
- */
 export const useDocuments = () => {
-	// Document data state
-	const [ documents, setDocuments ] = useState( [] );
-	const [ totalDocuments, setTotalDocuments ] = useState( 0 );
+	// ===================================================================
+	// Visible table data
+	// ===================================================================
+	const [ documents, setDocuments ] = useState( [] ); // Current page of documents
+	const [ totalDocuments, setTotalDocuments ] = useState( 0 ); // Total after filtering
 	const [ currentPage, setCurrentPage ] = useState( 1 );
 	const [ totalPages, setTotalPages ] = useState( 1 );
-	const [ statusCounts, setStatusCounts ] = useState( {} );
+	const [ statusCounts, setStatusCounts ] = useState( {} ); // { all: 123, trash: 5, ... }
 
-	// Loading and error states
+	// ===================================================================
+	// Internal cache & loading state
+	// ===================================================================
+	const [ allDocumentsCache, setAllDocumentsCache ] = useState( [] );
+	const [ isCacheLoaded, setIsCacheLoaded ] = useState( false );
+
+	// ===================================================================
+	// UI state
+	// ===================================================================
+	const [ searchTerm, setSearchTerm ] = useState( '' );
 	const [ isLoading, setIsLoading ] = useState( false );
 	const [ isDeleting, setIsDeleting ] = useState( false );
 	const [ error, setError ] = useState( null );
 
-	// Search and pagination parameters
+	// ===================================================================
+	// Table parameters
+	// ===================================================================
 	const [ searchParams, setSearchParams ] = useState( {
 		page: 1,
 		per_page: window.documentRepositorySettings?.perPage || 20,
@@ -53,310 +67,328 @@ export const useDocuments = () => {
 		status: 'all',
 	} );
 
-	/**
-	 * Fetch documents from the API
-	 *
-	 * Retrieves documents based on current search parameters.
-	 * Updates document list, pagination info, and loading states.
-	 *
-	 * @async
-	 * @function fetchDocuments
-	 * @throws {Error} If API request fails or response is invalid
-	 */
-	const fetchDocuments = useCallback( async () => {
-		if ( ! window.documentRepositorySettings?.apiNamespace ) {
-			setError(
-				'Document Repository settings not found. Make sure the script is properly enqueued in WordPress.'
-			);
-			return;
-		}
+	const { apiNamespace } = window.documentRepositorySettings || {};
+	const isFirstRender = useRef( true );
 
-		setIsLoading( true );
-		setError( null );
+	// ===================================================================
+	// Refresh global status counts (used for tabs) – fetched from status=all
+	// ===================================================================
+	/**
+	 * Refresh global status counts for tabs (All, Trash, etc.)
+	 * Fetches a minimal request to get status_counts from the API
+	 * @return {Promise<void>}
+	 */
+	const refreshStatusCounts = useCallback( async () => {
+		if ( ! apiNamespace ) return;
 
 		try {
-			const { apiNamespace } = window.documentRepositorySettings;
+			const response = await apiFetch( {
+				path: `/${ apiNamespace }/documents?per_page=1&page=1&status=all`,
+			} );
+			if ( response?.status_counts ) {
+				setStatusCounts( response.status_counts );
+			}
+		} catch {
+			// Fail silently – counts are not critical
+		}
+	}, [ apiNamespace ] );
 
-			// Build query string for pagination
-			const queryParams = new URLSearchParams();
+	// ===================================================================
+	// Fetch all documents for current status filter (batched)
+	// ===================================================================
+	/**
+	 * Fetch all documents for the current status filter in batches of 100
+	 * Updates the internal cache and status counts
+	 * @param {string|null} statusOverride Optional status to fetch instead of current filter
+	 * @return {Promise<void>}
+	 */
+	const fetchAllDocuments = useCallback(
+		async ( statusOverride = null ) => {
+			if ( ! apiNamespace ) {
+				setError( 'API namespace missing' );
+				return;
+			}
 
-			// Add all parameters to query
-			Object.entries( searchParams ).forEach( ( [ key, value ] ) => {
-				if ( value ) {
-					queryParams.append( key, value );
+			setIsLoading( true );
+			setError( null );
+
+			// Determine status to fetch
+			let statusToFetch = null;
+			if ( statusOverride !== null ) {
+				statusToFetch = statusOverride;
+			} else if ( searchParams.status && searchParams.status !== 'all' ) {
+				statusToFetch = searchParams.status;
+			}
+
+			try {
+				const allDocs = [];
+				let page = 1;
+				let counts = {};
+
+				while ( true ) {
+					const params = new URLSearchParams( {
+						per_page: '100',
+						page: String( page ),
+					} );
+					if ( statusToFetch )
+						params.append( 'status', statusToFetch );
+
+					const response = await apiFetch( {
+						path: `/${ apiNamespace }/documents?${ params }`,
+					} );
+
+					if ( ! response?.documents?.length ) break;
+
+					allDocs.push( ...response.documents );
+
+					if ( page === 1 && response.status_counts ) {
+						counts = response.status_counts;
+					}
+
+					if ( response.documents.length < 100 ) break;
+					page++;
 				}
+
+				setAllDocumentsCache( allDocs );
+				setStatusCounts( counts );
+				setIsCacheLoaded( true );
+			} catch ( err ) {
+				setError( err.message || 'Failed to load documents' );
+				setAllDocumentsCache( [] );
+				setIsCacheLoaded( false );
+			} finally {
+				setIsLoading( false );
+			}
+		},
+		[ apiNamespace, searchParams.status ]
+	);
+
+	// ===================================================================
+	// Initial load – only once
+	// ===================================================================
+	useEffect( () => {
+		if ( isFirstRender.current ) {
+			isFirstRender.current = false;
+			fetchAllDocuments();
+		}
+	}, [ fetchAllDocuments ] );
+
+	// ===================================================================
+	// Reload cache when status filter changes (All → Trash, etc.)
+	// ===================================================================
+	useEffect( () => {
+		if ( ! isFirstRender.current ) {
+			setIsCacheLoaded( false );
+			fetchAllDocuments();
+		}
+	}, [ searchParams.status, fetchAllDocuments ] );
+
+	// ===================================================================
+	// Client-side search → sort → paginate (instant, no API calls)
+	// ===================================================================
+	const processed = useMemo( () => {
+		if ( ! isCacheLoaded || ! allDocumentsCache.length ) {
+			return { docs: [], total: 0, totalPages: 1 };
+		}
+
+		let list = allDocumentsCache;
+
+		// Search
+		if ( searchTerm.trim() ) {
+			const term = searchTerm.toLowerCase().trim();
+			list = allDocumentsCache.filter( ( doc ) => {
+				const titleMatch = ( doc.title || '' )
+					.toLowerCase()
+					.includes( term );
+				const excerptMatch = ( doc.excerpt || '' )
+					.toLowerCase()
+					.includes( term );
+				const metaMatch = doc.metadata
+					? Object.values( doc.metadata ).some( ( v ) =>
+							String( v || '' )
+								.toLowerCase()
+								.includes( term )
+					  )
+					: false;
+				return titleMatch || excerptMatch || metaMatch;
 			} );
+		}
 
-			// Add timeout to prevent indefinite loading
-			const timeoutPromise = new Promise( ( _, reject ) => {
-				setTimeout( () => {
-					reject(
-						new Error(
-							'Document fetch request timed out. Please try again.'
-						)
-					);
-				}, 5000 ); // 5 second timeout
+		// Sort
+		const sorted = [ ...list ].sort( ( a, b ) => {
+			let aVal =
+				searchParams.orderby === 'title' ? a.title || '' : a.date || 0;
+			let bVal =
+				searchParams.orderby === 'title' ? b.title || '' : b.date || 0;
+
+			if ( searchParams.orderby === 'title' ) {
+				aVal = aVal.toLowerCase();
+				bVal = bVal.toLowerCase();
+			} else {
+				aVal = new Date( aVal );
+				bVal = new Date( bVal );
+			}
+
+			const order = searchParams.order === 'ASC' ? 1 : -1;
+			return ( aVal > bVal ? 1 : -1 ) * order;
+		} );
+
+		// Paginate
+		const perPage = searchParams.per_page || 20;
+		const page = searchParams.page || 1;
+		const start = ( page - 1 ) * perPage;
+		const docs = sorted.slice( start, start + perPage );
+
+		return {
+			docs,
+			total: sorted.length,
+			totalPages: Math.ceil( sorted.length / perPage ) || 1,
+		};
+	}, [ allDocumentsCache, searchTerm, searchParams, isCacheLoaded ] );
+
+	// Apply processed data to visible state
+	useEffect( () => {
+		setDocuments( processed.docs );
+		setTotalDocuments( processed.total );
+		setTotalPages( processed.totalPages );
+		setCurrentPage( searchParams.page || 1 );
+
+		if ( processed.docs.length === 0 && searchParams.page > 1 ) {
+			setSearchParams( ( prev ) => ( { ...prev, page: 1 } ) );
+		}
+	}, [ processed, searchParams.page ] );
+
+	// Reset to page 1 on search
+	useEffect( () => {
+		setSearchParams( ( prev ) => ( { ...prev, page: 1 } ) );
+	}, [ searchTerm ] );
+
+	// ===================================================================
+	// Universal refresh: reload current view + update tab counts
+	// ===================================================================
+	/**
+	 * Refresh the document cache and status counts
+	 * Reloads all documents for the current status filter and updates tab counts
+	 * @return {Promise<void>}
+	 */
+	const refresh = useCallback( async () => {
+		setIsCacheLoaded( false );
+		await fetchAllDocuments();
+		await refreshStatusCounts();
+	}, [ fetchAllDocuments, refreshStatusCounts ] );
+
+	// ===================================================================
+	// Document actions
+	// ===================================================================
+
+	/**
+	 * Permanently delete a document
+	 * @param {number|string} id Document ID
+	 * @return {Promise<boolean>} Success
+	 */
+	const deleteDocument = async ( id ) => {
+		setIsDeleting( true );
+		try {
+			await apiFetch( {
+				path: `/${ apiNamespace }/documents/${ id }?force=true`,
+				method: 'DELETE',
 			} );
-
-			// Fetch documents from API with timeout
-			const response = await Promise.race( [
-				apiFetch( {
-					path: `/${ apiNamespace }/documents?${ queryParams.toString() }`,
-				} ),
-				timeoutPromise,
-			] );
-
-			// Validate the response structure
-			if ( ! response || typeof response !== 'object' ) {
-				throw new Error( 'Invalid response from server' );
-			}
-
-			// Ensure documents is an array and each item has required properties
-			const validDocuments = Array.isArray( response.documents )
-				? response.documents.filter(
-						( doc ) => doc && typeof doc === 'object' && doc.id
-				  )
-				: [];
-
-			// Update state with fetched data
-			setDocuments( validDocuments );
-			setTotalDocuments( response.total || 0 );
-			setCurrentPage( response.current_page || 1 );
-			setTotalPages( response.total_pages || 1 );
-			setStatusCounts( response.status_counts || {} );
-
-			// If we got no documents but the page number is greater than 1,
-			// we should reset to page 1
-			if ( validDocuments.length === 0 && searchParams.page > 1 ) {
-				setSearchParams( ( prev ) => ( {
-					...prev,
-					page: 1,
-				} ) );
-			}
-		} catch ( err ) {
-			setError( err.message || 'Error loading documents' );
-			// Don't clear the documents array on error to prevent UI flicker
-			// Only update if we're on page 1
-			if ( searchParams.page === 1 ) {
-				setDocuments( [] );
-				setTotalDocuments( 0 );
-				setTotalPages( 1 );
-			}
+			await refresh();
+			return true;
+		} catch {
+			setError( 'Failed to permanently delete document' );
+			return false;
 		} finally {
-			setIsLoading( false );
-		}
-	}, [ searchParams ] );
-
-	// Update current page when search params change
-	useEffect( () => {
-		const newPage = parseInt( searchParams.page, 10 );
-		if ( ! isNaN( newPage ) && newPage !== currentPage ) {
-			setCurrentPage( newPage );
-		}
-	}, [ searchParams.page, currentPage ] );
-
-	// Fetch documents when search parameters change
-	useEffect( () => {
-		fetchDocuments();
-	}, [ fetchDocuments ] );
-
-	/**
-	 * Delete a document
-	 *
-	 * @async
-	 * @function deleteDocument
-	 * @param {number} documentId - Document ID to delete
-	 * @return {Promise<boolean>} Success status
-	 * @throws {Error} If deletion fails
-	 */
-	const deleteDocument = async ( documentId ) => {
-		setIsDeleting( true );
-
-		try {
-			const { apiNamespace } = window.documentRepositorySettings;
-
-			// Delete document from API
-			await apiFetch( {
-				path: `/${ apiNamespace }/documents/${ documentId }?force=true`,
-				method: 'DELETE',
-			} );
-
-			// Refresh documents list
-			await fetchDocuments();
 			setIsDeleting( false );
-			return true;
-		} catch ( err ) {
-			setError( err.message || 'Error deleting document' );
-			setIsDeleting( false );
-			return false;
 		}
 	};
 
 	/**
-	 * Trash a document (move to Trash instead of deleting permanently)
-	 *
-	 * @async
-	 * @function trashDocument
-	 * @param {number} documentId - Document ID to trash
-	 * @return {Promise<boolean>} Success status
-	 * @throws {Error} If trashing fails
+	 * Move document to trash
+	 * @param {number|string} id Document ID
+	 * @return {Promise<boolean>} Success
 	 */
-	const trashDocument = async ( documentId ) => {
+	const trashDocument = async ( id ) => {
 		setIsDeleting( true );
-
 		try {
-			const { apiNamespace } = window.documentRepositorySettings;
-
-			// Trash the document using force: false
 			await apiFetch( {
-				path: `/${ apiNamespace }/documents/${ documentId }?force=false`,
+				path: `/${ apiNamespace }/documents/${ id }?force=false`,
 				method: 'DELETE',
 			} );
-
-			await fetchDocuments();
-			setIsDeleting( false );
+			await refresh();
 			return true;
-		} catch ( err ) {
-			setError( err.message || 'Error trashing document' );
-			setIsDeleting( false );
+		} catch {
+			setError( 'Failed to move document to trash' );
 			return false;
+		} finally {
+			setIsDeleting( false );
 		}
 	};
 
 	/**
-	 * Restore a document from trash (change status back to 'publish' or active)
-	 *
-	 * @async
-	 * @function restoreDocument
-	 * @param {number} documentId - Document ID to restore
-	 * @return {Promise<boolean>} Success status
-	 * @throws {Error} If restore fails
+	 * Restore document from trash
+	 * @param {number|string} id Document ID
+	 * @return {Promise<boolean>} Success
 	 */
-	const restoreDocument = async ( documentId ) => {
+	const restoreDocument = async ( id ) => {
 		setIsDeleting( true );
-
 		try {
-			const { apiNamespace } = window.documentRepositorySettings;
-
-			// WordPress native restore endpoint
 			await apiFetch( {
-				path: `/${ apiNamespace }/documents/${ documentId }/restore`,
+				path: `/${ apiNamespace }/documents/${ id }/restore`,
 				method: 'POST',
 			} );
-
-			await fetchDocuments();
+			await refresh();
+			return true;
+		} catch {
+			setError( 'Failed to restore document' );
+			return false;
+		} finally {
 			setIsDeleting( false );
-			return true;
-		} catch ( err ) {
-			setError( err.message || 'Error restoring document' );
-			setIsDeleting( false );
-			return false;
 		}
 	};
 
-	/**
-	 * Update a document
-	 *
-	 * @async
-	 * @function updateDocument
-	 * @param {number} documentId - Document ID to update
-	 * @param {Object} data       - Document data to update
-	 * @return {Promise<Object|null>} Updated document or null on error
-	 * @throws {Error} If update fails
-	 */
-	const updateDocument = async ( documentId, data ) => {
-		try {
-			const { apiNamespace } = window.documentRepositorySettings;
-
-			// Update document via API
-			const response = await apiFetch( {
-				path: `/${ apiNamespace }/documents/${ documentId }`,
-				method: 'PUT',
-				data,
-			} );
-
-			// Refresh documents list
-			await fetchDocuments();
-			return response;
-		} catch ( err ) {
-			setError( err.message || 'Error updating document' );
-			return null;
-		}
-	};
-
-	/**
-	 * Bulk update documents
-	 *
-	 * @async
-	 * @function bulkUpdateDocuments
-	 * @param {Array<number>} documentIds - Document IDs to update
-	 * @param {Object}        data        - Data to update for all documents
-	 * @return {Promise<boolean>} Success status
-	 * @throws {Error} If bulk update fails
-	 */
-	const bulkUpdateDocuments = async ( documentIds, data ) => {
-		try {
-			// Update each document sequentially
-			for ( const id of documentIds ) {
-				await updateDocument( id, data );
-			}
-
-			// Refresh documents list
-			await fetchDocuments();
-			return true;
-		} catch ( err ) {
-			setError( err.message || 'Error performing bulk update' );
-			return false;
-		}
-	};
-
-	/**
-	 * Bulk delete documents
-	 *
-	 * @async
-	 * @function bulkDeleteDocuments
-	 * @param {Array<number>} documentIds - Document IDs to delete
-	 * @return {Promise<boolean>} Success status
-	 * @throws {Error} If bulk delete fails
-	 */
-	const bulkDeleteDocuments = async ( documentIds ) => {
-		try {
-			// Delete each document sequentially
-			for ( const id of documentIds ) {
-				await deleteDocument( id );
-			}
-
-			return true;
-		} catch ( err ) {
-			setError( err.message || 'Error performing bulk delete' );
-			return false;
-		}
-	};
-
+	// ===================================================================
+	// Return hook API
+	// ===================================================================
 	return {
 		// Document data
+		/** @type {Array} Current page of documents after filtering, sorting, and pagination */
 		documents,
+		/** @type {number} Total number of documents after filtering (before pagination) */
 		totalDocuments,
+		/** @type {number} Current page number (1-indexed) */
 		currentPage,
+		/** @type {number} Total number of pages */
 		totalPages,
+		/** @type {Object} Status counts for tabs: { all: number, trash: number, ... } */
 		statusCounts,
 
-		// Loading states
+		// Loading & error states
+		/** @type {boolean} Whether documents are currently being fetched */
 		isLoading,
+		/** @type {boolean} Whether a delete/trash/restore operation is in progress */
 		isDeleting,
+		/** @type {string|null} Error message if an operation failed */
 		error,
 
-		// Search and filter parameters
+		// Search & filter controls
+		/** @type {string} Current search term for client-side filtering */
+		searchTerm,
+		/** @type {Function} Setter for search term */
+		setSearchTerm,
+		/** @type {Object} Search parameters: { page, per_page, orderby, order, status } */
 		searchParams,
+		/** @type {Function} Setter for search parameters */
 		setSearchParams,
 
-		// Document operations
-		fetchDocuments,
+		// Actions
+		/** @type {Function} Refresh documents and status counts */
+		fetchDocuments: refresh,
+		/** @type {Function} Permanently delete a document */
 		deleteDocument,
+		/** @type {Function} Move a document to trash */
 		trashDocument,
+		/** @type {Function} Restore a document from trash */
 		restoreDocument,
-		updateDocument,
-		bulkUpdateDocuments,
-		bulkDeleteDocuments,
 	};
 };
