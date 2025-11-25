@@ -825,15 +825,13 @@ class DocumentMetadataManager {
 
     /**
      * Update taxonomy terms for a field.
+     * Synchronize taxonomy terms with field options.
+     * Efficient, safe, and production-ready.
      *
      * @param array $field Metadata field definition.
      * @return bool Whether terms were updated successfully.
      */
-/**
- * Synchronize taxonomy terms with field options.
- * Efficient, safe, and production-ready.
- */
-public function update_taxonomy_terms( array $field ): bool {
+    public function update_taxonomy_terms( array $field ): bool {
     if ( ( $field['type'] ?? '' ) !== 'taxonomy' ) {
         return false;
     }
