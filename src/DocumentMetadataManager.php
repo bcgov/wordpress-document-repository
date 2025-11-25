@@ -825,71 +825,93 @@ class DocumentMetadataManager {
 
     /**
      * Update taxonomy terms for a field.
+     * Synchronize taxonomy terms with field options.
+     * Efficient, safe, and production-ready.
      *
      * @param array $field Metadata field definition.
      * @return bool Whether terms were updated successfully.
      */
     public function update_taxonomy_terms( array $field ): bool {
-        if ( 'taxonomy' !== $field['type'] ) {
-            return false;
-        }
+		if ( ( $field['type'] ?? '' ) !== 'taxonomy' ) {
+			return false;
+		}
 
-        $taxonomy_name = $field['id'];
+		$taxonomy = $this->get_taxonomy_name_for_field( $field['id'] ?? '' );
 
-        // Get existing terms.
-        $existing_terms = get_terms(
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return false;
+		}
+
+		// 1. Normalize desired terms
+		$desired_names = $this->extract_and_normalize_term_names( $field['options'] ?? [] );
+		$desired_names = array_unique( $desired_names );
+		sort( $desired_names );
+
+		// 2. Get current terms (lightweight)
+		$current_terms = get_terms(
             [
-				'taxonomy'   => $taxonomy_name,
-				'hide_empty' => false,
+				'taxonomy'               => $taxonomy,
+				'hide_empty'             => false,
+				'fields'                 => 'id=>name',
+				'update_term_meta_cache' => false,
 			]
         );
 
-        if ( is_wp_error( $existing_terms ) ) {
-            return false;
-        }
+		if ( is_wp_error( $current_terms ) || ! is_array( $current_terms ) ) {
+			return false;
+		}
 
-        $existing_term_names = array_map(
-            function ( $term ) {
-                return $term->name;
-            },
-            $existing_terms
-        );
+		$current_names   = array_values( $current_terms );
+		$term_id_by_name = array_flip( $current_terms );
 
-        // Safely handle options that might contain arrays or non-string values.
-        $new_term_names = [];
-        if ( isset( $field['options'] ) && is_array( $field['options'] ) ) {
-            foreach ( $field['options'] as $option ) {
-                if ( is_string( $option ) ) {
-                    $trimmed = trim( $option );
-                    if ( ! empty( $trimmed ) ) {
-                        $new_term_names[] = $trimmed;
-                    }
-                }
-            }
-        }
+		sort( $current_names );
 
-        // Delete terms that are no longer in the options.
-        $terms_to_delete = array_diff( $existing_term_names, $new_term_names );
-        foreach ( $terms_to_delete as $term_name ) {
-            $term = get_term_by( 'name', $term_name, $taxonomy_name );
-            if ( $term ) {
-                // Remove term relationships from all documents before deleting.
-                $this->remove_term_from_all_documents( $term->term_id, $taxonomy_name );
+		// 3. No changes? Exit early (most common case)
+		if ( $current_names === $desired_names ) {
+			return true;
+		}
 
-                // Delete the term.
-                wp_delete_term( $term->term_id, $taxonomy_name );
-            }
-        }
+		$to_delete = array_diff( $current_names, $desired_names );
+		$to_create = array_diff( $desired_names, $current_names );
 
-        // Add new terms.
-        $terms_to_add = array_diff( $new_term_names, $existing_term_names );
-        if ( ! empty( $terms_to_add ) ) {
-            $this->create_taxonomy_terms( $taxonomy_name, $terms_to_add );
-        }
+		$changed = false;
 
-        return true;
-    }
+		// 4. Delete removed terms
+		foreach ( $to_delete as $name ) {
+			$term_id = $term_id_by_name[ $name ] ?? 0;
+			if ( ! $term_id ) {
+				continue;
+			}
 
+			$this->remove_term_from_all_documents( $term_id, $taxonomy );
+
+			// wp_delete_term returns false|WP_Error on failure, array on success.
+			$deleted = wp_delete_term( $term_id, $taxonomy );
+			if ( $deleted && ! is_wp_error( $deleted ) ) {
+				$changed = true;
+			}
+		}
+
+		// 5. Create new terms
+		foreach ( $to_create as $name ) {
+			// Avoid duplicates if term was created concurrently.
+			if ( term_exists( $name, $taxonomy ) ) {
+				continue;
+			}
+
+			$inserted = wp_insert_term( $name, $taxonomy );
+			if ( ! is_wp_error( $inserted ) ) {
+				$changed = true;
+			}
+		}
+
+		// 6. Clean cache only if something changed
+		if ( $changed ) {
+			clean_taxonomy_cache( $taxonomy );
+		}
+
+		return true;
+	}
     /**
      * Remove a specific term from all documents.
      *
