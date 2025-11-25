@@ -832,84 +832,86 @@ class DocumentMetadataManager {
      * @return bool Whether terms were updated successfully.
      */
     public function update_taxonomy_terms( array $field ): bool {
-    if ( ( $field['type'] ?? '' ) !== 'taxonomy' ) {
-        return false;
-    }
+		if ( ( $field['type'] ?? '' ) !== 'taxonomy' ) {
+			return false;
+		}
 
-    $taxonomy = $this->get_taxonomy_name_for_field( $field['id'] ?? '' );
+		$taxonomy = $this->get_taxonomy_name_for_field( $field['id'] ?? '' );
 
-    if ( ! taxonomy_exists( $taxonomy ) ) {
-        return false;
-    }
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return false;
+		}
 
-    // 1. Normalize desired terms
-    $desired_names = $this->extract_and_normalize_term_names( $field['options'] ?? [] );
-    $desired_names = array_unique( $desired_names );
-    sort( $desired_names );
+		// 1. Normalize desired terms
+		$desired_names = $this->extract_and_normalize_term_names( $field['options'] ?? [] );
+		$desired_names = array_unique( $desired_names );
+		sort( $desired_names );
 
-    // 2. Get current terms (lightweight)
-    $current_terms = get_terms( [
-        'taxonomy'               => $taxonomy,
-        'hide_empty'             => false,
-        'fields'                 => 'id=>name',
-        'update_term_meta_cache' => false,
-    ] );
+		// 2. Get current terms (lightweight)
+		$current_terms = get_terms(
+            [
+				'taxonomy'               => $taxonomy,
+				'hide_empty'             => false,
+				'fields'                 => 'id=>name',
+				'update_term_meta_cache' => false,
+			]
+        );
 
-    if ( is_wp_error( $current_terms ) || ! is_array( $current_terms ) ) {
-        return false;
-    }
+		if ( is_wp_error( $current_terms ) || ! is_array( $current_terms ) ) {
+			return false;
+		}
 
-    $current_names = array_values( $current_terms );
-    $term_id_by_name = array_flip( $current_terms );
+		$current_names   = array_values( $current_terms );
+		$term_id_by_name = array_flip( $current_terms );
 
-    sort( $current_names );
+		sort( $current_names );
 
-    // 3. No changes? Exit early (most common case)
-    if ( $current_names === $desired_names ) {
-        return true;
-    }
+		// 3. No changes? Exit early (most common case)
+		if ( $current_names === $desired_names ) {
+			return true;
+		}
 
-    $to_delete = array_diff( $current_names, $desired_names );
-    $to_create = array_diff( $desired_names, $current_names );
+		$to_delete = array_diff( $current_names, $desired_names );
+		$to_create = array_diff( $desired_names, $current_names );
 
-    $changed = false;
+		$changed = false;
 
-    // 4. Delete removed terms
-    foreach ( $to_delete as $name ) {
-        $term_id = $term_id_by_name[ $name ] ?? 0;
-        if ( ! $term_id ) {
-            continue;
-        }
+		// 4. Delete removed terms
+		foreach ( $to_delete as $name ) {
+			$term_id = $term_id_by_name[ $name ] ?? 0;
+			if ( ! $term_id ) {
+				continue;
+			}
 
-        $this->remove_term_from_all_documents( $term_id, $taxonomy );
+			$this->remove_term_from_all_documents( $term_id, $taxonomy );
 
-        // wp_delete_term returns false|WP_Error on failure, array on success
-        $deleted = wp_delete_term( $term_id, $taxonomy );
-        if ( $deleted && ! is_wp_error( $deleted ) ) {
-            $changed = true;
-        }
-    }
+			// wp_delete_term returns false|WP_Error on failure, array on success.
+			$deleted = wp_delete_term( $term_id, $taxonomy );
+			if ( $deleted && ! is_wp_error( $deleted ) ) {
+				$changed = true;
+			}
+		}
 
-    // 5. Create new terms
-    foreach ( $to_create as $name ) {
-        // Avoid duplicates if term was created concurrently
-        if ( term_exists( $name, $taxonomy ) ) {
-            continue;
-        }
+		// 5. Create new terms
+		foreach ( $to_create as $name ) {
+			// Avoid duplicates if term was created concurrently.
+			if ( term_exists( $name, $taxonomy ) ) {
+				continue;
+			}
 
-        $inserted = wp_insert_term( $name, $taxonomy );
-        if ( ! is_wp_error( $inserted ) ) {
-            $changed = true;
-        }
-    }
+			$inserted = wp_insert_term( $name, $taxonomy );
+			if ( ! is_wp_error( $inserted ) ) {
+				$changed = true;
+			}
+		}
 
-    // 6. Clean cache only if something changed
-    if ( $changed ) {
-        clean_taxonomy_cache( $taxonomy );
-    }
+		// 6. Clean cache only if something changed
+		if ( $changed ) {
+			clean_taxonomy_cache( $taxonomy );
+		}
 
-    return true;
-}
+		return true;
+	}
     /**
      * Remove a specific term from all documents.
      *
