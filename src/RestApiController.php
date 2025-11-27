@@ -112,6 +112,26 @@ class RestApiController {
 
         register_rest_route(
             $namespace,
+            '/csv-bulk-upload/export',
+            [
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [ $this, 'export_documents_to_csv' ],
+                    'permission_callback' => [ $this, 'check_read_permission' ],
+                    'args'                => [
+                        'status' => [
+                            'type'              => 'string',
+                            'default'           => 'publish',
+                            'description'       => 'Filter documents by post status: publish, draft, trash, any, or all',
+                            'sanitize_callback' => 'sanitize_text_field',
+                        ],
+                    ],
+                ],
+            ]
+        );
+
+        register_rest_route(
+            $namespace,
             '/documents/check-duplicate',
             [
 				'methods'             => 'GET',
@@ -1146,6 +1166,34 @@ class RestApiController {
             return new WP_Error(
                 'template_download_exception',
                 'An unexpected error occurred during template download: ' . $e->getMessage(),
+                [ 'status' => 500 ]
+            );
+        }
+    }
+
+    /**
+     * REST API callback to export documents to CSV.
+     *
+     * @param WP_REST_Request $request The REST API request object.
+     * @return void|WP_Error Exits with CSV download or returns error.
+     */
+    public function export_documents_to_csv( WP_REST_Request $request ) {
+        try {
+            $status = $request->get_param( 'status' ) ?? 'publish';
+
+            // Create CSV bulk uploader instance.
+            $csv_uploader = new CsvBulkUploader( $this->config, $this->uploader, $this->metadata_manager );
+
+            // Export documents to CSV.
+            $csv_uploader->export_documents_to_csv( $status );
+
+            // This should not be reached as export_documents_to_csv() calls exit.
+            return new WP_REST_Response( ['message' => 'CSV exported'], 200 );
+
+        } catch ( \Exception $e ) {
+            return new WP_Error(
+                'csv_export_exception',
+                'An unexpected error occurred during CSV export: ' . $e->getMessage(),
                 [ 'status' => 500 ]
             );
         }

@@ -239,6 +239,50 @@ const DocumentList = ( {
 		}
 	};
 
+	const handleExportToCsv = useCallback( () => {
+		const { apiRoot, apiNamespace, nonce } = window.documentRepositorySettings;
+		const status = documentStatusFilter === 'trash' ? 'trash' : 'publish';
+		const exportUrl = `${ apiRoot }${ apiNamespace }/csv-bulk-upload/export?status=${ status }`;
+
+		// Create a temporary link and trigger download
+		const link = document.createElement( 'a' );
+		link.href = exportUrl;
+		link.download = `document-export-${ new Date().toISOString().split( 'T' )[ 0 ] }.csv`;
+
+		// Add nonce to headers via fetch for proper authentication
+		fetch( exportUrl, {
+			headers: {
+				'X-WP-Nonce': nonce,
+			},
+		} )
+			.then( ( response ) => {
+				if ( ! response.ok ) {
+					throw new Error( 'Export failed' );
+				}
+				return response.blob();
+			} )
+			.then( ( blob ) => {
+				const url = window.URL.createObjectURL( blob );
+				link.href = url;
+				document.body.appendChild( link );
+				link.click();
+				document.body.removeChild( link );
+				window.URL.revokeObjectURL( url );
+
+				showNotification(
+					__( 'CSV export started', 'wordpress-document-repository' ),
+					'success'
+				);
+			} )
+			.catch( ( error ) => {
+				handleOperationError( 'export', error );
+				showNotification(
+					__( 'Failed to export CSV', 'wordpress-document-repository' ),
+					'error'
+				);
+			} );
+	}, [ documentStatusFilter, handleOperationError, showNotification ] );
+
 	// Helper functions to avoid nested ternary expressions
 	const getSingleDeleteButtonText = () => {
 		if ( isDeleting ) {
@@ -299,6 +343,12 @@ const DocumentList = ( {
 					<div className="document-list__right-actions">
 						<UploadArea onFilesSelected={ handleFilesWithLog } />
 						<CsvBulkUploader onUploadSuccess={ handleCsvUploadSuccess } />
+						<Button
+							className="doc-repo-button export-csv-button"
+							onClick={ handleExportToCsv }
+						>
+							{ __( 'Export to CSV', 'wordpress-document-repository' ) }
+						</Button>
 					</div>
 				</div>
 

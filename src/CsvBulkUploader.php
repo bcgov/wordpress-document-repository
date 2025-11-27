@@ -146,6 +146,11 @@ class CsvBulkUploader {
             );
         }
 
+        // Remove BOM (Byte Order Mark) if present
+        if ( substr( $file_content, 0, 3 ) === "\xEF\xBB\xBF" ) {
+            $file_content = substr( $file_content, 3 );
+        }
+
         // Detect encoding and convert to UTF-8 if needed
         $encoding = mb_detect_encoding( $file_content, [ 'UTF-8', 'ISO-8859-1', 'Windows-1252' ], true );
         if ( 'UTF-8' !== $encoding ) {
@@ -167,9 +172,21 @@ class CsvBulkUploader {
             );
         }
 
-        // Clean header row
-        $header = array_map( 'trim', $header );
-        $header = array_filter( $header ); // Remove empty columns
+        // Clean header row - remove BOM, trim, and remove invisible characters
+        $header = array_map( function( $column ) {
+            // Remove BOM if present
+            $column = preg_replace( '/\x{FEFF}/u', '', $column );
+            // Trim whitespace
+            $column = trim( $column );
+            // Remove any remaining invisible/control characters except spaces
+            $column = preg_replace( '/[\x00-\x1F\x7F]/u', '', $column );
+            return $column;
+        }, $header );
+        
+        // Remove completely empty columns but preserve keys
+        $header = array_filter( $header, function( $value ) {
+            return '' !== trim( $value );
+        } );
 
         if ( empty( $header ) ) {
             fclose( $handle );
@@ -237,20 +254,27 @@ class CsvBulkUploader {
      */
     private function validate_csv_structure( array $csv_data ) {
         $header = $csv_data['header'];
-        
-        // Check for required "Asset Filename" column (case-insensitive)
-        $has_asset_filename = false;
+
+        // Check for required "Title" column (case-insensitive)
+        $has_title = false;
+        $found_columns = [];
         foreach ( $header as $column ) {
-            if ( strtolower( trim( $column ) ) === 'asset filename' ) {
-                $has_asset_filename = true;
+            $column_clean = trim( $column );
+            $found_columns[] = $column_clean;
+            if ( strtolower( $column_clean ) === 'title' ) {
+                $has_title = true;
                 break;
             }
         }
-        
-        if ( ! $has_asset_filename ) {
+
+        if ( ! $has_title ) {
+            $columns_list = ! empty( $found_columns ) ? implode( ', ', $found_columns ) : 'none';
             return new WP_Error(
                 'csv_missing_required_column',
-                'CSV must contain the "Asset Filename" column to identify documents.'
+                sprintf(
+                    'CSV must contain the "Title" column to identify documents. Found columns: %s',
+                    $columns_list
+                )
             );
         }
 
@@ -368,28 +392,28 @@ class CsvBulkUploader {
      * @return array|WP_Error Row processing result or error.
      */
     private function process_csv_row( array $row_data, array $field_map, array $normalized_field_map, array $options ) {
-        // Find Asset Filename column (case-insensitive)
-        $asset_filename = '';
+        // Find Title column (case-insensitive)
+        $document_title = '';
         foreach ( $row_data as $key => $value ) {
-            if ( strtolower( trim( $key ) ) === 'asset filename' ) {
-                $asset_filename = trim( $value );
+            if ( strtolower( trim( $key ) ) === 'title' ) {
+                $document_title = trim( $value );
                 break;
             }
         }
-        
-        if ( empty( $asset_filename ) ) {
+
+        if ( empty( $document_title ) ) {
             return new WP_Error(
-                'empty_asset_filename',
-                'Asset Filename is empty.'
+                'empty_document_title',
+                'Title is empty.'
             );
         }
 
-        // Find documents by asset filename
-        $documents = $this->find_documents_by_filename( $asset_filename );
-        
+        // Find documents by title
+        $documents = $this->find_documents_by_title( $document_title );
+
         if ( empty( $documents ) ) {
             return [
-                'asset_filename'       => $asset_filename,
+                'document_title'       => $document_title,
                 'documents_found'      => 0,
                 'documents_not_found'  => 1,
                 'tags_applied'         => 0,
@@ -404,7 +428,7 @@ class CsvBulkUploader {
         // Process each found document
         foreach ( $documents as $document ) {
             $document_result = $this->apply_metadata_to_document( $document, $row_data, $field_map, $normalized_field_map, $options );
-            
+
             if ( is_wp_error( $document_result ) ) {
                 continue; // Skip this document but continue with others
             }
@@ -414,7 +438,7 @@ class CsvBulkUploader {
         }
 
         return [
-            'asset_filename'       => $asset_filename,
+            'document_title'       => $document_title,
             'documents_found'      => count( $documents ),
             'documents_not_found'  => 0,
             'tags_applied'         => $tags_applied,
@@ -424,75 +448,55 @@ class CsvBulkUploader {
     }
 
     /**
-     * Find documents by slug (post_name).
+     * Find documents by title (post_title).
      *
-     * @param string $asset_filename Asset filename from CSV (should match post slug).
+     * @param string $document_title Document title from CSV.
      * @return array Array of document posts.
      */
-    private function find_documents_by_filename( string $asset_filename ) {
-        // Normalize filename for matching (remove path, trim whitespace)
-        $filename_normalized = trim( basename( $asset_filename ) );
-        
-        // Remove extension to get the slug (slugs typically don't have extensions like .pdf)
-        $slug_candidate = pathinfo( $filename_normalized, PATHINFO_FILENAME );
-        
-        // WordPress slugs are typically lowercase, so try both original and lowercase
-        $slug_candidates = [
-            $slug_candidate,                    // Original case
-            strtolower( $slug_candidate ),     // Lowercase
-            sanitize_title( $slug_candidate ), // WordPress-sanitized version
-        ];
-        
-        // Remove duplicates
-        $slug_candidates = array_unique( $slug_candidates );
-        
-        // First try exact match on post slug (post_name) without extension
-        foreach ( $slug_candidates as $slug ) {
-            if ( empty( $slug ) ) {
-                continue;
-            }
-            
-            $query = new \WP_Query( [
-                'post_type'      => $this->config->get_post_type(),
-                'post_status'    => 'any', // Search all statuses
-                'posts_per_page' => -1,
-                'name'           => $slug, // Match by post slug
-            ] );
-            
-            if ( $query->have_posts() ) {
-                return $query->posts;
-            }
+    private function find_documents_by_title( string $document_title ) {
+        // Normalize title for matching (trim whitespace)
+        $title_normalized = trim( $document_title );
+
+        if ( empty( $title_normalized ) ) {
+            return [];
         }
 
-        // If no match, try with the full filename (in case the slug includes extension)
-        foreach ( [ $filename_normalized, strtolower( $filename_normalized ) ] as $full_filename ) {
-            $query = new \WP_Query( [
-                'post_type'      => $this->config->get_post_type(),
-                'post_status'    => 'any',
-                'posts_per_page' => -1,
-                'name'           => $full_filename, // Match by post slug with extension
-            ] );
-            
-            if ( $query->have_posts() ) {
-                return $query->posts;
-            }
+        // Try exact match on post title first
+        $query = new \WP_Query( [
+            'post_type'      => $this->config->get_post_type(),
+            'post_status'    => 'any', // Search all statuses
+            'posts_per_page' => -1,
+            'title'          => $title_normalized, // Match by post title
+            'exact'          => true, // Exact title match
+        ] );
+
+        if ( $query->have_posts() ) {
+            return $query->posts;
         }
 
-        // Fallback: try matching by document_file_name meta as backup
+        // Try case-insensitive match using LIKE
         $query = new \WP_Query( [
             'post_type'      => $this->config->get_post_type(),
             'post_status'    => 'any',
             'posts_per_page' => -1,
-            'meta_query'     => [
-                [
-                    'key'     => 'document_file_name',
-                    'value'   => $filename_normalized,
-                    'compare' => '=',
-                ],
-            ],
+            's'              => $title_normalized, // Search by title/content
+            'sentence'       => true, // Treat as exact phrase
         ] );
 
-        return $query->posts ?? [];
+        if ( $query->have_posts() ) {
+            // Filter results to only include exact title matches
+            $exact_matches = [];
+            foreach ( $query->posts as $post ) {
+                if ( strtolower( trim( $post->post_title ) ) === strtolower( $title_normalized ) ) {
+                    $exact_matches[] = $post;
+                }
+            }
+            if ( ! empty( $exact_matches ) ) {
+                return $exact_matches;
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -592,7 +596,7 @@ class CsvBulkUploader {
 
             // Skip special columns (case-insensitive)
             $column_lower = strtolower( $column );
-            if ( in_array( $column_lower, [ 'asset filename', 'title', 'excerpt', 'date' ], true ) ) {
+            if ( in_array( $column_lower, [ 'title', 'excerpt', 'date' ], true ) ) {
                 continue;
             }
 
@@ -919,8 +923,7 @@ class CsvBulkUploader {
         
         // Start with required and standard fields
         $template = [
-            'Asset Filename' => 'Asset Filename (required - filename of uploaded document)',
-            'Title'          => 'Title (post title)',
+            'Title'          => 'Title (required - document title for matching)',
             'Excerpt'        => 'Excerpt (post excerpt)',
             'Date'           => 'Date (post date)',
             'Category'      => 'Category',
@@ -966,9 +969,6 @@ class CsvBulkUploader {
         // Write example row
         $example_row = array_map( function( $key, $description ) {
             // Handle specific fields
-            if ( 'Asset Filename' === $key ) {
-                return 'example-document.pdf';
-            }
             if ( 'Title' === $key ) {
                 return 'Example Document Title';
             }
@@ -996,6 +996,105 @@ class CsvBulkUploader {
         
         fputcsv( $output, $example_row );
         
+        fclose( $output );
+        exit;
+    }
+
+    /**
+     * Export documents to CSV file.
+     *
+     * @param string $status Post status filter (default: 'publish').
+     * @return void
+     */
+    public function export_documents_to_csv( string $status = 'publish' ) {
+        // Get all documents with the specified status
+        $documents_result = $this->metadata_manager->get_documents(
+            [
+                'paged'      => 1,
+                'per_page'   => -1, // Get all documents
+                'status'     => $status,
+            ]
+        );
+
+        $documents = $documents_result['documents'] ?? [];
+
+        if ( empty( $documents ) ) {
+            wp_die( 'No documents found to export.', 'CSV Export Error', [ 'response' => 404 ] );
+        }
+
+        // Get all metadata fields
+        $metadata_fields = $this->metadata_manager->get_metadata_fields();
+
+        // Build header row - start with Title, then add all metadata fields
+        $header = [ 'Title' ];
+        $header[] = 'Excerpt';
+        $header[] = 'Date';
+
+        // Add all metadata fields - use field label for display
+        foreach ( $metadata_fields as $field ) {
+            // Use field label or ID as column name
+            $column_name = ! empty( $field['label'] ) ? $field['label'] : $field['id'];
+            if ( ! in_array( $column_name, $header, true ) ) {
+                $header[] = $column_name;
+            }
+        }
+
+        // Set headers for CSV download
+        $filename = sprintf( 'document-export-%s.csv', date( 'Y-m-d-H-i-s' ) );
+        header( 'Content-Type: text/csv; charset=UTF-8' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Pragma: no-cache' );
+        header( 'Expires: 0' );
+
+        // Output UTF-8 BOM for Excel compatibility
+        echo "\xEF\xBB\xBF";
+
+        // Output CSV content
+        $output = fopen( 'php://output', 'w' );
+
+        // Write header row
+        fputcsv( $output, $header );
+
+        // Write data rows
+        foreach ( $documents as $document ) {
+            $row = [];
+
+            // Title (required)
+            $row[] = $document['title'] ?? '';
+
+            // Excerpt
+            $row[] = $document['excerpt'] ?? '';
+
+            // Date
+            $row[] = ! empty( $document['date'] ) ? date( 'Y-m-d', strtotime( $document['date'] ) ) : '';
+
+            // Get document metadata
+            $document_metadata = $document['metadata'] ?? [];
+
+            // Add metadata field values in the same order as header
+            // Skip first 3 columns (Title, Excerpt, Date) which are already added
+            foreach ( $metadata_fields as $field ) {
+                $field_id = $field['id'];
+
+                // Get value from document metadata
+                $value = '';
+                if ( isset( $document_metadata[ $field_id ] ) ) {
+                    $meta_val = $document_metadata[ $field_id ];
+                    
+                    // Handle array values (like taxonomy terms which are arrays of term names)
+                    if ( is_array( $meta_val ) ) {
+                        $value = implode( ', ', array_filter( $meta_val ) );
+                    } else {
+                        $value = $meta_val;
+                    }
+                }
+
+                $row[] = $value;
+            }
+
+            fputcsv( $output, $row );
+        }
+
         fclose( $output );
         exit;
     }

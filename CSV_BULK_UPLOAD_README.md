@@ -4,14 +4,15 @@ This feature allows you to upload CSV files to automatically tag existing docume
 
 ## How It Works
 
-1. **CSV Structure**: Upload a CSV file with columns for document titles/names and metadata fields
-2. **Auto-Matching**: The system finds existing documents by title and applies metadata from the CSV..
-3. **Bulk Processing**: Process hundreds of documents at once instead of editing them individually
+1. **CSV Structure**: Upload a CSV file with a "title" column and metadata fields
+2. **Auto-Matching**: The system finds existing documents by title and applies metadata from the CSV
+3. **Selective Updates**: Only metadata fields present in the CSV are updated; existing metadata not in the CSV remains unchanged
+4. **Bulk Processing**: Process hundreds of documents at once instead of editing them individually
 
 ## CSV Format Requirements
 
 ### Required Columns
-- **`title`** or **`name`**: Document title or filename (at least one must exist)
+- **`title`**: Document title (required for matching)
 
 ### Metadata Columns
 - Any column name that matches an existing metadata field ID will be processed
@@ -100,9 +101,9 @@ The system provides detailed error reporting:
 ### Common Issues
 
 **Documents Not Found**
-- Check if document titles match exactly (including case)
+- Check if document titles in CSV match exactly with existing document titles (including case)
 - Verify documents exist and are published
-- Check for extra spaces or special characters
+- Check for extra spaces or special characters in titles
 
 **Metadata Not Applied**
 - Ensure column names match metadata field IDs exactly
