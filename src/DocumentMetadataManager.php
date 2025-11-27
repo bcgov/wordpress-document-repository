@@ -777,29 +777,7 @@ class DocumentMetadataManager {
         $total_terms   = 0;
 
         foreach ( $terms as $term_data ) {
-            $term_name = '';
-
-            // Handle both string values and objects.
-            if ( is_array( $term_data ) || is_object( $term_data ) ) {
-                // Convert object to array for consistent handling.
-                $term_array = (array) $term_data;
-
-                // Extract the term name from the object/array.
-                if ( isset( $term_array['name'] ) ) {
-                    $term_name = $term_array['name'];
-                } elseif ( isset( $term_array['label'] ) ) {
-                    $term_name = $term_array['label'];
-                } else {
-                    // If it's just a plain array, skip.
-                    continue;
-                }
-            } elseif ( is_string( $term_data ) ) {
-                $term_name = $term_data;
-            } else {
-                continue;
-            }
-
-            $term_name = trim( (string) $term_name );
+            $term_name = $this->extract_term_name( $term_data );
             if ( empty( $term_name ) ) {
                 continue;
             }
@@ -821,6 +799,51 @@ class DocumentMetadataManager {
         }
 
         return $success_count === $total_terms;
+    }
+
+    /**
+     * Extract term name from various formats (string, object, array).
+     *
+     * @param mixed $term_data Term data in various formats.
+     * @return string|null Extracted term name or null if not found.
+     */
+    private function extract_term_name( $term_data ): ?string {
+        if ( is_string( $term_data ) ) {
+            return trim( $term_data );
+        }
+
+        if ( is_array( $term_data ) || is_object( $term_data ) ) {
+            $term_array = (array) $term_data;
+            if ( isset( $term_array['name'] ) ) {
+                return trim( (string) $term_array['name'] );
+            }
+            if ( isset( $term_array['label'] ) ) {
+                return trim( (string) $term_array['label'] );
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract and normalize term names from options array.
+     *
+     * Handles various formats: strings, objects with 'name' or 'label', arrays.
+     *
+     * @param array $options Array of term options (can be strings, objects, or arrays).
+     * @return array Array of normalized term names (strings).
+     */
+    private function extract_and_normalize_term_names( array $options ): array {
+        $names = array();
+
+        foreach ( $options as $option ) {
+            $term_name = $this->extract_term_name( $option );
+            if ( ! empty( $term_name ) ) {
+                $names[] = $term_name;
+            }
+        }
+
+        return $names;
     }
 
     /**

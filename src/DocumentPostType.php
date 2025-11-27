@@ -83,6 +83,17 @@ class DocumentPostType {
 
         register_post_type( $post_type, $args );
 
+        // Explicitly unregister default WordPress taxonomies (category, post_tag) from this post type
+        // to prevent confusion with custom taxonomies (e.g., doc_category).
+        // This ensures the default category taxonomy doesn't appear for document post types.
+        // Note: unregister_taxonomy_for_object_type is safe to call even if not registered.
+        $default_taxonomies = array( 'category', 'post_tag' );
+        foreach ( $default_taxonomies as $taxonomy ) {
+            if ( taxonomy_exists( $taxonomy ) ) {
+                unregister_taxonomy_for_object_type( $taxonomy, $post_type );
+            }
+        }
+
         // Register metadata fields for REST API.
         $this->register_metadata_fields();
 
