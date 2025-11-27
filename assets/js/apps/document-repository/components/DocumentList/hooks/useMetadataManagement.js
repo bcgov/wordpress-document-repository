@@ -488,60 +488,90 @@ const useMetadataManagement = ( {
 				}
 			);
 
-			const updatePromises = docsToUpdate.map( ( [ docId, edited ] ) => {
-				const original = localDocuments.find(
-					( doc ) => doc.id.toString() === docId
-				);
+			// Process updates in batches to avoid timeout with large numbers of documents
+			const BATCH_SIZE = 50; // Process 50 documents at a time
+			const batches = [];
+			for ( let i = 0; i < docsToUpdate.length; i += BATCH_SIZE ) {
+				batches.push( docsToUpdate.slice( i, i + BATCH_SIZE ) );
+			}
 
-				const metaDataToUpdate = {};
-				metadataFields.forEach( ( field ) => {
-					const origVal = original.metadata?.[ field.id ] ?? '';
-					const editVal = edited[ field.id ] ?? '';
-					if ( String( origVal ) !== String( editVal ) ) {
-						metaDataToUpdate[ field.id ] = editVal;
+			const allResults = [];
+
+			// Process each batch sequentially to avoid overwhelming the server
+			let processedCount = 0;
+			for ( const batch of batches ) {
+				// Show progress notification if there are many batches
+				if ( batches.length > 1 && onShowNotification ) {
+					processedCount += batch.length;
+					onShowNotification(
+						'info',
+						sprintf(
+							/* translators: %1$d: processed count, %2$d: total count */
+							__( 'Processing batch: %1$d of %2$d documents...', 'bcgov-design-system' ),
+							processedCount,
+							docsToUpdate.length
+						)
+					);
+				}
+				const updatePromises = batch.map( ( [ docId, edited ] ) => {
+					const original = localDocuments.find(
+						( doc ) => doc.id.toString() === docId
+					);
+
+					const metaDataToUpdate = {};
+					metadataFields.forEach( ( field ) => {
+						const origVal = original.metadata?.[ field.id ] ?? '';
+						const editVal = edited[ field.id ] ?? '';
+						if ( String( origVal ) !== String( editVal ) ) {
+							metaDataToUpdate[ field.id ] = editVal;
+						}
+					} );
+
+					const excerptChanged =
+						String( original.excerpt ?? '' ) !==
+						String( edited.excerpt ?? '' );
+
+					// Prepare API calls with document ID tracking
+					const calls = [];
+
+					if ( Object.keys( metaDataToUpdate ).length > 0 ) {
+						calls.push(
+							apiFetch( {
+								path: `/${ apiNamespace }/documents/${ docId }/metadata`,
+								method: 'POST',
+								data: metaDataToUpdate,
+							} ).then( ( result ) => ( {
+								type: 'metadata',
+								docId,
+								result,
+							} ) )
+						);
 					}
+
+					if ( excerptChanged ) {
+						calls.push(
+							apiFetch( {
+								path: `/${ apiNamespace }/documents/${ docId }`,
+								method: 'PUT',
+								data: { excerpt: edited.excerpt },
+							} ).then( ( result ) => ( {
+								type: 'excerpt',
+								docId,
+								result,
+							} ) )
+						);
+					}
+
+					// Run all needed calls for this document in parallel
+					return Promise.all( calls );
 				} );
 
-				const excerptChanged =
-					String( original.excerpt ?? '' ) !==
-					String( edited.excerpt ?? '' );
+				// Wait for this batch to complete before moving to the next
+				const batchResults = await Promise.allSettled( updatePromises.flat() );
+				allResults.push( ...batchResults );
+			}
 
-				// Prepare API calls with document ID tracking
-				const calls = [];
-
-				if ( Object.keys( metaDataToUpdate ).length > 0 ) {
-					calls.push(
-						apiFetch( {
-							path: `/${ apiNamespace }/documents/${ docId }/metadata`,
-							method: 'POST',
-							data: metaDataToUpdate,
-						} ).then( ( result ) => ( {
-							type: 'metadata',
-							docId,
-							result,
-						} ) )
-					);
-				}
-
-				if ( excerptChanged ) {
-					calls.push(
-						apiFetch( {
-							path: `/${ apiNamespace }/documents/${ docId }`,
-							method: 'PUT',
-							data: { excerpt: edited.excerpt },
-						} ).then( ( result ) => ( {
-							type: 'excerpt',
-							docId,
-							result,
-						} ) )
-					);
-				}
-
-				// Run all needed calls for this document in parallel
-				return Promise.all( calls );
-			} );
-
-			const results = await Promise.allSettled( updatePromises.flat() );
+			const results = allResults;
 
 			// Process results with proper document tracking
 			const failed = results

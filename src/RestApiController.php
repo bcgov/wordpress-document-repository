@@ -968,6 +968,11 @@ class RestApiController {
      * @return WP_REST_Response|WP_Error The response object or error.
      */
     public function update_document_metadata( WP_REST_Request $request ) {
+        // Increase timeout for bulk operations
+        set_time_limit( 300 ); // 5 minutes
+        if ( function_exists( 'ini_set' ) ) {
+            @ini_set( 'max_execution_time', '300' );
+        }
         $document_id = (int) $request->get_param( 'id' );
         $metadata    = $request->get_json_params();
 

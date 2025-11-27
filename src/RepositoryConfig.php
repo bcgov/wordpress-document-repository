@@ -38,7 +38,7 @@ class RepositoryConfig {
 
         // REST API settings.
         'api_namespace'      => 'bcgov-document-repository/v1',
-        'per_page'           => 500,
+        'per_page'           => 200,
 
         // Frontend scripts.
         'js_handle'          => 'document-repository',
