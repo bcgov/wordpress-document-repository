@@ -21,6 +21,20 @@ class CsvBulkUploader {
     private RepositoryConfig $config;
 
     /**
+     * Last searched filename (for debugging).
+     *
+     * @var string
+     */
+    private string $last_searched_filename = '';
+
+    /**
+     * Sample of available filenames (for debugging).
+     *
+     * @var array
+     */
+    private array $available_filenames_sample = [];
+
+    /**
      * Document uploader service.
      *
      * @var DocumentUploader
@@ -255,24 +269,24 @@ class CsvBulkUploader {
     private function validate_csv_structure( array $csv_data ) {
         $header = $csv_data['header'];
 
-        // Check for required "Title" column (case-insensitive)
-        $has_title = false;
+        // Check for required "name" column (case-insensitive) - matches post slug
+        $has_name = false;
         $found_columns = [];
         foreach ( $header as $column ) {
             $column_clean = trim( $column );
             $found_columns[] = $column_clean;
-            if ( strtolower( $column_clean ) === 'title' ) {
-                $has_title = true;
+            if ( strtolower( $column_clean ) === 'name' ) {
+                $has_name = true;
                 break;
             }
         }
 
-        if ( ! $has_title ) {
+        if ( ! $has_name ) {
             $columns_list = ! empty( $found_columns ) ? implode( ', ', $found_columns ) : 'none';
             return new WP_Error(
                 'csv_missing_required_column',
                 sprintf(
-                    'CSV must contain the "Title" column to identify documents. Found columns: %s',
+                    'CSV must contain the "name" column to identify documents by attachment filename (without extension). Found columns: %s',
                     $columns_list
                 )
             );
@@ -364,6 +378,16 @@ class CsvBulkUploader {
                     $results['successful_tags'] += $row_result['tags_applied'];
                     $results['documents_found'] += $row_result['documents_found'];
                     $results['documents_not_found'] += $row_result['documents_not_found'];
+                    
+                    // Add detailed information for debugging
+                    if ( isset( $row_result['documents_not_found'] ) && $row_result['documents_not_found'] > 0 ) {
+                        $results['errors'][] = [
+                            'row'     => $row_number,
+                            'message' => $row_result['error_message'] ?? 'Document not found',
+                            'data'    => $row_data,
+                        ];
+                    }
+                    
                     $results['details'][] = $row_result;
                 }
                 
@@ -392,33 +416,52 @@ class CsvBulkUploader {
      * @return array|WP_Error Row processing result or error.
      */
     private function process_csv_row( array $row_data, array $field_map, array $normalized_field_map, array $options ) {
-        // Find Title column (case-insensitive)
-        $document_title = '';
+        // Find name column (case-insensitive) - matches attachment filename without extension
+        $document_filename = '';
         foreach ( $row_data as $key => $value ) {
-            if ( strtolower( trim( $key ) ) === 'title' ) {
-                $document_title = trim( $value );
+            if ( strtolower( trim( $key ) ) === 'name' ) {
+                // Trim all whitespace including tabs, newlines, etc.
+                $document_filename = trim( $value, " \t\n\r\0\x0B" );
                 break;
             }
         }
 
-        if ( empty( $document_title ) ) {
+        if ( empty( $document_filename ) ) {
             return new WP_Error(
-                'empty_document_title',
-                'Title is empty.'
+                'empty_document_filename',
+                'Name (filename) is empty.'
             );
         }
 
-        // Find documents by title
-        $documents = $this->find_documents_by_title( $document_title );
+        // Find documents by attachment filename (without extension)
+        $documents = $this->find_documents_by_slug( $document_filename );
 
         if ( empty( $documents ) ) {
+            $filename_without_ext = pathinfo( $document_filename, PATHINFO_FILENAME );
+            $error_message = sprintf(
+                'No document found with filename "%s" (without extension: "%s").',
+                $document_filename,
+                $filename_without_ext
+            );
+            
+            // Add sample of available filenames if we have them
+            if ( ! empty( $this->available_filenames_sample ) ) {
+                $error_message .= sprintf(
+                    ' Sample of available filenames: %s. Use "Export to CSV" to see all exact filenames.',
+                    implode( ', ', array_slice( $this->available_filenames_sample, 0, 5 ) )
+                );
+            } else {
+                $error_message .= ' Make sure the "name" column matches the attachment filename (without extension). Use "Export to CSV" to see the exact format.';
+            }
+            
             return [
-                'document_title'       => $document_title,
+                'document_filename'    => $document_filename,
                 'documents_found'      => 0,
                 'documents_not_found'  => 1,
                 'tags_applied'         => 0,
                 'metadata_applied'     => [],
                 'status'               => 'no_documents_found',
+                'error_message'        => $error_message,
             ];
         }
 
@@ -430,6 +473,13 @@ class CsvBulkUploader {
             $document_result = $this->apply_metadata_to_document( $document, $row_data, $field_map, $normalized_field_map, $options );
 
             if ( is_wp_error( $document_result ) ) {
+                // Add error to metadata_applied for reporting
+                $metadata_applied[] = [
+                    'field'  => 'document',
+                    'value'  => $document->ID,
+                    'status' => 'failed',
+                    'error'  => $document_result->get_error_message(),
+                ];
                 continue; // Skip this document but continue with others
             }
 
@@ -438,7 +488,7 @@ class CsvBulkUploader {
         }
 
         return [
-            'document_title'       => $document_title,
+            'document_filename'    => $document_filename,
             'documents_found'      => count( $documents ),
             'documents_not_found'  => 0,
             'tags_applied'         => $tags_applied,
@@ -448,55 +498,92 @@ class CsvBulkUploader {
     }
 
     /**
-     * Find documents by title (post_title).
+     * Find documents by attachment filename (without extension).
      *
-     * @param string $document_title Document title from CSV.
-     * @return array Array of document posts.
+     * @param string $document_filename Document filename from CSV (without extension).
+     * @return array Array of document posts with 'filename' key for debugging.
      */
-    private function find_documents_by_title( string $document_title ) {
-        // Normalize title for matching (trim whitespace)
-        $title_normalized = trim( $document_title );
+    private function find_documents_by_slug( string $document_filename ) {
+        // Normalize filename for matching - trim all whitespace including tabs and newlines
+        $filename_normalized = trim( $document_filename, " \t\n\r\0\x0B" );
 
-        if ( empty( $title_normalized ) ) {
+        if ( empty( $filename_normalized ) ) {
             return [];
         }
 
-        // Try exact match on post title first
+        // Remove any extension that might be in the CSV value
+        $filename_without_ext = pathinfo( $filename_normalized, PATHINFO_FILENAME );
+        $target_filename_lower = strtolower( $filename_without_ext );
+
+        // Get all documents of this post type
         $query = new \WP_Query( [
             'post_type'      => $this->config->get_post_type(),
             'post_status'    => 'any', // Search all statuses
             'posts_per_page' => -1,
-            'title'          => $title_normalized, // Match by post title
-            'exact'          => true, // Exact title match
+            'update_post_meta_cache' => true, // Ensure meta is cached
         ] );
 
-        if ( $query->have_posts() ) {
-            return $query->posts;
+        if ( ! $query->have_posts() ) {
+            return [];
         }
 
-        // Try case-insensitive match using LIKE
-        $query = new \WP_Query( [
-            'post_type'      => $this->config->get_post_type(),
-            'post_status'    => 'any',
-            'posts_per_page' => -1,
-            's'              => $title_normalized, // Search by title/content
-            'sentence'       => true, // Treat as exact phrase
-        ] );
-
-        if ( $query->have_posts() ) {
-            // Filter results to only include exact title matches
-            $exact_matches = [];
-            foreach ( $query->posts as $post ) {
-                if ( strtolower( trim( $post->post_title ) ) === strtolower( $title_normalized ) ) {
+        // Filter to exact matches (filename without extension, case-insensitive)
+        $exact_matches = [];
+        $all_filenames = []; // For debugging - collect all filenames
+        
+        foreach ( $query->posts as $post ) {
+            // Try to get document_file_name from meta
+            $file_name = get_post_meta( $post->ID, 'document_file_name', true );
+            
+            // If not found in meta, try to get it from attachment
+            if ( empty( $file_name ) ) {
+                $file_id = get_post_meta( $post->ID, 'document_file_id', true );
+                if ( $file_id ) {
+                    $file_path = get_attached_file( $file_id );
+                    if ( $file_path ) {
+                        $file_name = basename( $file_path );
+                    }
+                }
+            }
+            
+            if ( $file_name ) {
+                $file_name_without_ext = pathinfo( $file_name, PATHINFO_FILENAME );
+                $all_filenames[] = $file_name_without_ext; // Store for debugging
+                
+                // Compare without extensions, case-insensitive
+                if ( strtolower( $file_name_without_ext ) === $target_filename_lower ) {
                     $exact_matches[] = $post;
                 }
             }
-            if ( ! empty( $exact_matches ) ) {
-                return $exact_matches;
+        }
+        
+        // If no matches by filename, try matching by post title as fallback
+        // Only if the title closely matches the filename (contains the filename or vice versa)
+        if ( empty( $exact_matches ) ) {
+            foreach ( $query->posts as $post ) {
+                $post_title_normalized = strtolower( trim( $post->post_title ) );
+                // Remove common punctuation and normalize spaces/underscores for comparison
+                $post_title_cleaned = preg_replace( '/[^a-z0-9_]/', '', $post_title_normalized );
+                $target_cleaned = preg_replace( '/[^a-z0-9_]/', '', $target_filename_lower );
+                
+                // Match if cleaned versions are similar (one contains the other, or they're very similar)
+                if ( $post_title_cleaned === $target_cleaned ||
+                     ( strlen( $target_cleaned ) > 10 && strpos( $post_title_cleaned, $target_cleaned ) !== false ) ||
+                     ( strlen( $post_title_cleaned ) > 10 && strpos( $target_cleaned, $post_title_cleaned ) !== false ) ) {
+                    $exact_matches[] = $post;
+                }
             }
         }
-
-        return [];
+        
+        // Store available filenames for debugging (limit to first 10 to avoid huge error messages)
+        if ( empty( $exact_matches ) && ! empty( $all_filenames ) ) {
+            $sample_filenames = array_slice( array_unique( $all_filenames ), 0, 10 );
+            // Store in a way we can access it in the error message
+            $this->last_searched_filename = $filename_without_ext;
+            $this->available_filenames_sample = $sample_filenames;
+        }
+        
+        return $exact_matches;
     }
 
     /**
@@ -596,7 +683,7 @@ class CsvBulkUploader {
 
             // Skip special columns (case-insensitive)
             $column_lower = strtolower( $column );
-            if ( in_array( $column_lower, [ 'title', 'excerpt', 'date' ], true ) ) {
+            if ( in_array( $column_lower, [ 'name', 'title', 'excerpt', 'date' ], true ) ) {
                 continue;
             }
 
@@ -872,45 +959,10 @@ class CsvBulkUploader {
      * @return bool Whether the field was applied successfully.
      */
     private function apply_regular_metadata_field( int $document_id, string $field_id, $value ) {
-        // Validate and sanitize value based on field type
-        $field = $this->metadata_manager->get_metadata_fields();
-        $field_definition = null;
-        
-        foreach ( $field as $f ) {
-            if ( $f['id'] === $field_id ) {
-                $field_definition = $f;
-                break;
-            }
-        }
-
-        if ( $field_definition ) {
-            switch ( $field_definition['type'] ) {
-                case 'date':
-                    // Validate date format
-                    $timestamp = strtotime( $value );
-                    if ( false === $timestamp ) {
-                        return false;
-                    }
-                    $value = date( 'Y-m-d', $timestamp );
-                    break;
-                
-                case 'number':
-                    // Validate number
-                    if ( ! is_numeric( $value ) ) {
-                        return false;
-                    }
-                    $value = floatval( $value );
-                    break;
-                
-                case 'text':
-                default:
-                    $value = sanitize_text_field( $value );
-                    break;
-            }
-        }
-
-        $result = update_post_meta( $document_id, $field_id, $value );
-        return false !== $result;
+        // Use metadata manager to save for consistency and proper handling
+        $metadata_to_save = [ $field_id => $value ];
+        $result = $this->metadata_manager->save_document_metadata( $document_id, $metadata_to_save );
+        return $result;
     }
 
     /**
@@ -923,7 +975,8 @@ class CsvBulkUploader {
         
         // Start with required and standard fields
         $template = [
-            'Title'          => 'Title (required - document title for matching)',
+            'name'           => 'name (required - attachment filename without extension for matching)',
+            'Title'          => 'Title (post title)',
             'Excerpt'        => 'Excerpt (post excerpt)',
             'Date'           => 'Date (post date)',
             'Category'      => 'Category',
@@ -969,6 +1022,9 @@ class CsvBulkUploader {
         // Write example row
         $example_row = array_map( function( $key, $description ) {
             // Handle specific fields
+            if ( 'name' === $key ) {
+                return 'example-document-filename';
+            }
             if ( 'Title' === $key ) {
                 return 'Example Document Title';
             }
@@ -1025,8 +1081,9 @@ class CsvBulkUploader {
         // Get all metadata fields
         $metadata_fields = $this->metadata_manager->get_metadata_fields();
 
-        // Build header row - start with Title, then add all metadata fields
-        $header = [ 'Title' ];
+        // Build header row - start with name (slug), then Title, then add all metadata fields
+        $header = [ 'name' ]; // Required for matching
+        $header[] = 'Title';
         $header[] = 'Excerpt';
         $header[] = 'Date';
 
@@ -1059,7 +1116,17 @@ class CsvBulkUploader {
         foreach ( $documents as $document ) {
             $row = [];
 
-            // Title (required)
+            // name (filename without extension) - required for matching
+            $file_name = $document['metadata']['document_file_name'] ?? '';
+            if ( $file_name ) {
+                // Remove extension from filename
+                $file_name_without_ext = pathinfo( $file_name, PATHINFO_FILENAME );
+                $row[] = $file_name_without_ext;
+            } else {
+                $row[] = '';
+            }
+
+            // Title
             $row[] = $document['title'] ?? '';
 
             // Excerpt

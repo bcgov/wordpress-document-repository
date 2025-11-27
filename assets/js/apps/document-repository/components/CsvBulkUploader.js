@@ -350,7 +350,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 				<div className="csv-info">
 					<p>
 						{ __(
-							'Upload a CSV file to automatically tag existing documents with metadata. The CSV should have a column for document titles/names and columns for each metadata field you want to apply.',
+							'Upload a CSV file to automatically tag existing documents with metadata. The CSV must have a "name" column (attachment filename without extension) and columns for each metadata field you want to apply.',
 							'wordpress-document-repository'
 						) }
 					</p>

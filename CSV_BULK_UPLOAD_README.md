@@ -4,15 +4,15 @@ This feature allows you to upload CSV files to automatically tag existing docume
 
 ## How It Works
 
-1. **CSV Structure**: Upload a CSV file with a "title" column and metadata fields
-2. **Auto-Matching**: The system finds existing documents by title and applies metadata from the CSV
+1. **CSV Structure**: Upload a CSV file with a "name" column (attachment filename without extension) and metadata fields
+2. **Auto-Matching**: The system finds existing documents by attachment filename (without extension) and applies metadata from the CSV
 3. **Selective Updates**: Only metadata fields present in the CSV are updated; existing metadata not in the CSV remains unchanged
 4. **Bulk Processing**: Process hundreds of documents at once instead of editing them individually
 
 ## CSV Format Requirements
 
 ### Required Columns
-- **`title`**: Document title (required for matching)
+- **`name`**: Attachment filename without extension (required for matching - e.g., "document-name" for "document-name.pdf")
 
 ### Metadata Columns
 - Any column name that matches an existing metadata field ID will be processed
@@ -20,10 +20,12 @@ This feature allows you to upload CSV files to automatically tag existing docume
 
 ### Example CSV Structure
 ```csv
-title,author,department,publish_date,status
-Annual Report 2024,John Doe,Finance,2024-01-15,Published
-Q4 Budget,Jane Smith,Accounting,2024-01-20,Draft
+name,Title,author,department,publish_date,status
+annual-report-2024,Annual Report 2024,John Doe,Finance,2024-01-15,Published
+q4-budget,Q4 Budget,Jane Smith,Accounting,2024-01-20,Draft
 ```
+
+**Note**: The "name" column should contain the attachment filename without the extension. For example, if your file is "annual-report-2024.pdf", use "annual-report-2024" in the name column.
 
 ## How to Use
 
@@ -92,7 +94,7 @@ The system provides detailed error reporting:
 
 1. **Backup First**: Always backup your data before bulk operations
 2. **Test Small**: Test with a few documents first
-3. **Check Titles**: Ensure document titles in CSV match exactly
+3. **Check Slugs**: Ensure document slugs in the "name" column match exactly (use Export to CSV to see correct format)
 4. **Validate Data**: Verify metadata values are in correct format
 5. **Review Results**: Always check the processing results
 
@@ -101,9 +103,10 @@ The system provides detailed error reporting:
 ### Common Issues
 
 **Documents Not Found**
-- Check if document titles in CSV match exactly with existing document titles (including case)
+- Check if filenames in the "name" column match exactly with existing attachment filenames (without extension)
 - Verify documents exist and are published
-- Check for extra spaces or special characters in titles
+- The "name" column should contain the filename without extension (e.g., "annual-report-2024" for "annual-report-2024.pdf")
+- Use the "Export to CSV" feature to see the correct filename format for your documents
 
 **Metadata Not Applied**
 - Ensure column names match metadata field IDs exactly
