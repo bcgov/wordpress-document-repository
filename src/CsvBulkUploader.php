@@ -361,12 +361,16 @@ class CsvBulkUploader {
         }
 
         // Process rows in batches to avoid timeout
-        // Smaller batch size for very large files to prevent web server timeouts
-        $batch_size = 50; // Process 50 rows at a time to avoid gateway timeouts
+        // Batch size optimized to balance speed and reliability
+        // Web server timeouts (typically 60-120s) are the main constraint
+        $batch_size = 100; // Process 100 rows at a time (can be increased if server allows)
         $total_rows = count( $rows );
         $batches = array_chunk( $rows, $batch_size, true ); // Preserve keys
         
         foreach ( $batches as $batch_index => $batch ) {
+            // Reset time limit at the start of each batch
+            set_time_limit( 600 ); // Reset to 10 minutes for each batch
+            
             // Process each row in the batch
             foreach ( $batch as $row_index => $row_data ) {
                 $row_number = $row_index + 2; // +2 because we start after header and arrays are 0-indexed
@@ -405,7 +409,7 @@ class CsvBulkUploader {
                 }
             }
             
-            // After each batch, flush output and reset time limit
+            // After each batch, flush output and free memory
             // This helps prevent timeouts and allows progress tracking
             if ( function_exists( 'fastcgi_finish_request' ) ) {
                 // For FastCGI, flush output buffer
@@ -417,12 +421,15 @@ class CsvBulkUploader {
                 @flush();
             }
             
-            // Reset execution time after each batch to prevent timeout
-            if ( $batch_index < count( $batches ) - 1 ) {
-                set_time_limit( 600 ); // Reset to 10 minutes for next batch
-                // Also clear any object cache to free memory
-                if ( function_exists( 'wp_cache_flush_group' ) ) {
-                    wp_cache_flush_group( 'posts' );
+            // Clear cache and free memory after each batch
+            if ( function_exists( 'wp_cache_flush_group' ) ) {
+                wp_cache_flush_group( 'posts' );
+            }
+            
+            // Force garbage collection every 5 batches to free memory
+            if ( $batch_index > 0 && ( $batch_index % 5 ) === 0 ) {
+                if ( function_exists( 'gc_collect_cycles' ) ) {
+                    gc_collect_cycles();
                 }
             }
         }

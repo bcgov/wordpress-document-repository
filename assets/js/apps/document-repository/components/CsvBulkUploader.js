@@ -118,7 +118,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 				// Handle 504 Gateway Timeout specifically
 				if ( response.status === 504 ) {
 					throw new Error(
-						'Request timed out. The CSV file may be too large or the server is taking too long to process. Please try processing a smaller batch or contact your administrator.'
+						'Request timed out. For CSV files with 1000+ rows, please split the file into smaller batches (500-1000 rows each) and process them separately. This prevents web server timeouts.'
 					);
 				}
 
@@ -137,7 +137,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 					if ( response.status === 504 ) {
 						errorData = {
 							message:
-								'Gateway timeout. The server took too long to process your CSV file. Please try processing a smaller batch or contact your administrator.',
+								'Gateway timeout. For CSV files with 1000+ rows, please split the file into smaller batches (500-1000 rows each) and process them separately.',
 						};
 					} else {
 						errorData = {
@@ -157,7 +157,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 		} catch ( err ) {
 			if ( err.name === 'AbortError' ) {
 				setError(
-					'Request timed out after 5 minutes. The CSV file may be too large. Please try processing a smaller batch or contact your administrator.'
+					'Request timed out after 5 minutes. For CSV files with 1000+ rows, please split the file into smaller batches (500-1000 rows each) and process them separately.'
 				);
 			} else {
 				setError( err.message || 'Failed to process CSV file.' );
@@ -336,6 +336,12 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 					<p>
 						{ __(
 							'Upload a CSV file to automatically tag existing documents with metadata. The CSV must have a "name" column (attachment filename without extension) and columns for each metadata field you want to apply.',
+							'wordpress-document-repository'
+						) }
+					</p>
+					<p style={ { fontSize: '13px', color: '#666', fontStyle: 'italic' } }>
+						{ __(
+							'Note: For CSV files with 1000+ rows, consider splitting into smaller batches (500-1000 rows each) to avoid timeout issues.',
 							'wordpress-document-repository'
 						) }
 					</p>
