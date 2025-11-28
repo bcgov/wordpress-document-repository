@@ -45,8 +45,8 @@ q4-budget,Q4 Budget,Jane Smith,Accounting,2024-01-20,Draft
 
 ## Processing Options
 
-- **Create missing taxonomy terms automatically**: When enabled, new taxonomy terms will be created if they don't exist
-- **Overwrite existing metadata**: Choose whether to replace existing metadata or skip it
+- **Selective Updates**: Only metadata fields present in the CSV are updated; existing metadata not in the CSV remains unchanged
+- **Taxonomy Terms**: Only existing taxonomy terms are used; terms that don't exist in the system are skipped
 
 ## What Happens During Processing
 

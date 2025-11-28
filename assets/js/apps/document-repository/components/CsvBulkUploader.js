@@ -25,10 +25,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 	const [ error, setError ] = useState( null );
 	const [ processingOptions, setProcessingOptions ] = useState( {
 		overwriteExisting: false,
-		createMissingTerms: true,
 	} );
-
-	const fileInputRef = useRef( null );
 
 	// Get settings from WordPress
 	const { apiNamespace } = window.documentRepositorySettings;
@@ -177,9 +174,13 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 		setCsvFile( null );
 		setResults( null );
 		setError( null );
-		if ( fileInputRef.current ) {
-			fileInputRef.current.value = '';
-		}
+		// Find and reset file input by type
+		const fileInputs = document.querySelectorAll( 'input[type="file"]' );
+		fileInputs.forEach( ( input ) => {
+			if ( input.accept && input.accept.includes( 'csv' ) ) {
+				input.value = '';
+			}
+		} );
 	};
 
 	/**
@@ -274,7 +275,6 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 					<FormFileUpload
 						accept=".csv,text/csv"
 						onChange={ handleFileChange }
-						ref={ fileInputRef }
 					>
 						{ __( 'Choose CSV File', 'wordpress-document-repository' ) }
 					</FormFileUpload>
@@ -285,22 +285,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 					) }
 				</div>
 
-				<div className="csv-options-section">
-					<h4>{ __( 'Processing Options', 'wordpress-document-repository' ) }</h4>
-					<label>
-						<input
-							type="checkbox"
-							checked={ processingOptions.createMissingTerms }
-							onChange={ ( e ) =>
-								setProcessingOptions( ( prev ) => ( {
-									...prev,
-									createMissingTerms: e.target.checked,
-								} ) )
-							}
-						/>
-						{ __( 'Create missing taxonomy terms automatically', 'wordpress-document-repository' ) }
-					</label>
-				</div>
+				{/* Processing options removed - no longer needed */}
 
 				<div className="modal-actions">
 					<Button
@@ -364,7 +349,6 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 					<FormFileUpload
 						accept=".csv,text/csv"
 						onChange={ handleFileChange }
-						ref={ fileInputRef }
 					>
 						{ __( 'Choose CSV File', 'wordpress-document-repository' ) }
 					</FormFileUpload>
@@ -375,22 +359,7 @@ const CsvBulkUploader = ({ onUploadSuccess, modalMode = false }) => {
 					) }
 				</div>
 
-				<div className="csv-options-section">
-					<h4>{ __( 'Processing Options', 'wordpress-document-repository' ) }</h4>
-					<label>
-						<input
-							type="checkbox"
-							checked={ processingOptions.createMissingTerms }
-							onChange={ ( e ) =>
-								setProcessingOptions( ( prev ) => ( {
-									...prev,
-									createMissingTerms: e.target.checked,
-								} ) )
-							}
-						/>
-						{ __( 'Create missing taxonomy terms automatically', 'wordpress-document-repository' ) }
-					</label>
-				</div>
+				{/* Processing options removed - no longer needed */}
 			</CardBody>
 
 			<CardFooter>

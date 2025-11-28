@@ -361,7 +361,8 @@ class CsvBulkUploader {
         }
 
         // Process rows in batches to avoid timeout
-        $batch_size = 100; // Process 100 rows at a time
+        // Smaller batch size for very large files to prevent web server timeouts
+        $batch_size = 50; // Process 50 rows at a time to avoid gateway timeouts
         $total_rows = count( $rows );
         $batches = array_chunk( $rows, $batch_size, true ); // Preserve keys
         
@@ -385,16 +386,11 @@ class CsvBulkUploader {
                         $results['documents_found'] += $row_result['documents_found'];
                         $results['documents_not_found'] += $row_result['documents_not_found'];
                         
-                        // Add detailed information for debugging
-                        if ( isset( $row_result['documents_not_found'] ) && $row_result['documents_not_found'] > 0 ) {
-                            $results['errors'][] = [
-                                'row'     => $row_number,
-                                'message' => $row_result['error_message'] ?? 'Document not found',
-                                'data'    => $row_data,
-                            ];
+                        // Don't add errors for documents not found - just continue processing
+                        // Only add to details if documents were found and updated
+                        if ( $row_result['documents_found'] > 0 && $row_result['tags_applied'] > 0 ) {
+                            $results['details'][] = $row_result;
                         }
-                        
-                        $results['details'][] = $row_result;
                     }
                     
                     $results['processed_rows']++;
@@ -464,24 +460,8 @@ class CsvBulkUploader {
         // Find documents by attachment filename (without extension)
         $documents = $this->find_documents_by_slug( $document_filename );
 
+        // If no documents found, silently skip (don't add error, just return empty result)
         if ( empty( $documents ) ) {
-            $filename_without_ext = pathinfo( $document_filename, PATHINFO_FILENAME );
-            $error_message = sprintf(
-                'No document found with filename "%s" (without extension: "%s").',
-                $document_filename,
-                $filename_without_ext
-            );
-            
-            // Add sample of available filenames if we have them
-            if ( ! empty( $this->available_filenames_sample ) ) {
-                $error_message .= sprintf(
-                    ' Sample of available filenames: %s. Use "Export to CSV" to see all exact filenames.',
-                    implode( ', ', array_slice( $this->available_filenames_sample, 0, 5 ) )
-                );
-            } else {
-                $error_message .= ' Make sure the "name" column matches the attachment filename (without extension). Use "Export to CSV" to see the exact format.';
-            }
-            
             return [
                 'document_filename'    => $document_filename,
                 'documents_found'      => 0,
@@ -489,7 +469,6 @@ class CsvBulkUploader {
                 'tags_applied'         => 0,
                 'metadata_applied'     => [],
                 'status'               => 'no_documents_found',
-                'error_message'        => $error_message,
             ];
         }
 
@@ -556,8 +535,8 @@ class CsvBulkUploader {
         }
 
         // Filter to exact matches (filename without extension, case-insensitive)
+        // Also handle WordPress-generated suffixes like "-1", "-2", etc.
         $exact_matches = [];
-        $all_filenames = []; // For debugging - collect all filenames
         
         foreach ( $query->posts as $post ) {
             // Try to get document_file_name from meta
@@ -576,17 +555,35 @@ class CsvBulkUploader {
             
             if ( $file_name ) {
                 $file_name_without_ext = pathinfo( $file_name, PATHINFO_FILENAME );
-                $all_filenames[] = $file_name_without_ext; // Store for debugging
+                $file_name_lower = strtolower( $file_name_without_ext );
                 
-                // Compare without extensions, case-insensitive
-                if ( strtolower( $file_name_without_ext ) === $target_filename_lower ) {
+                // Exact match
+                if ( $file_name_lower === $target_filename_lower ) {
                     $exact_matches[] = $post;
+                    continue;
+                }
+                
+                // Match with WordPress suffixes (e.g., "filename-1", "filename-2")
+                // Remove suffix pattern like "-1", "-2", etc. and compare
+                $file_name_no_suffix = preg_replace( '/-\d+$/', '', $file_name_lower );
+                $target_no_suffix = preg_replace( '/-\d+$/', '', $target_filename_lower );
+                
+                if ( $file_name_no_suffix === $target_no_suffix ) {
+                    $exact_matches[] = $post;
+                    continue;
+                }
+                
+                // Also try matching the target against the file with suffix
+                // (in case CSV has "filename" but DB has "filename-1")
+                if ( $file_name_lower === $target_no_suffix || 
+                     preg_match( '/^' . preg_quote( $target_no_suffix, '/' ) . '-\d+$/', $file_name_lower ) ) {
+                    $exact_matches[] = $post;
+                    continue;
                 }
             }
         }
         
         // If no matches by filename, try matching by post title as fallback
-        // Only if the title closely matches the filename (contains the filename or vice versa)
         if ( empty( $exact_matches ) ) {
             foreach ( $query->posts as $post ) {
                 $post_title_normalized = strtolower( trim( $post->post_title ) );
@@ -601,14 +598,6 @@ class CsvBulkUploader {
                     $exact_matches[] = $post;
                 }
             }
-        }
-        
-        // Store available filenames for debugging (limit to first 10 to avoid huge error messages)
-        if ( empty( $exact_matches ) && ! empty( $all_filenames ) ) {
-            $sample_filenames = array_slice( array_unique( $all_filenames ), 0, 10 );
-            // Store in a way we can access it in the error message
-            $this->last_searched_filename = $filename_without_ext;
-            $this->available_filenames_sample = $sample_filenames;
         }
         
         return $exact_matches;
@@ -953,21 +942,13 @@ class CsvBulkUploader {
         $term_ids = [];
         
         foreach ( $values as $term_name ) {
-            // Try to find existing term
+            // Only use existing terms - don't create new ones
             $term = get_term_by( 'name', $term_name, $taxonomy_name );
             
-            if ( ! $term ) {
-                // Create new term if it doesn't exist
-                $term_result = wp_insert_term( $term_name, $taxonomy_name );
-                if ( is_wp_error( $term_result ) ) {
-                    continue; // Skip this term
-                }
-                $term_id = $term_result['term_id'];
-            } else {
-                $term_id = $term->term_id;
+            if ( $term ) {
+                $term_ids[] = $term->term_id;
             }
-            
-            $term_ids[] = $term_id;
+            // Skip terms that don't exist - don't create them
         }
 
         if ( ! empty( $term_ids ) ) {
