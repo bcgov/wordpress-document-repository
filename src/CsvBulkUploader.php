@@ -360,46 +360,74 @@ class CsvBulkUploader {
             }
         }
 
-        // Process each row
-        foreach ( $rows as $row_index => $row_data ) {
-            $row_number = $row_index + 2; // +2 because we start after header and arrays are 0-indexed
-            
-            try {
-                $row_result = $this->process_csv_row( $row_data, $field_map, $normalized_field_map, $options );
+        // Process rows in batches to avoid timeout
+        $batch_size = 100; // Process 100 rows at a time
+        $total_rows = count( $rows );
+        $batches = array_chunk( $rows, $batch_size, true ); // Preserve keys
+        
+        foreach ( $batches as $batch_index => $batch ) {
+            // Process each row in the batch
+            foreach ( $batch as $row_index => $row_data ) {
+                $row_number = $row_index + 2; // +2 because we start after header and arrays are 0-indexed
                 
-                if ( is_wp_error( $row_result ) ) {
+                try {
+                    $row_result = $this->process_csv_row( $row_data, $field_map, $normalized_field_map, $options );
+                    
+                    if ( is_wp_error( $row_result ) ) {
+                        $results['errors'][] = [
+                            'row'     => $row_number,
+                            'message' => $row_result->get_error_message(),
+                            'data'    => $row_data,
+                        ];
+                        $results['failed_tags']++;
+                    } else {
+                        $results['successful_tags'] += $row_result['tags_applied'];
+                        $results['documents_found'] += $row_result['documents_found'];
+                        $results['documents_not_found'] += $row_result['documents_not_found'];
+                        
+                        // Add detailed information for debugging
+                        if ( isset( $row_result['documents_not_found'] ) && $row_result['documents_not_found'] > 0 ) {
+                            $results['errors'][] = [
+                                'row'     => $row_number,
+                                'message' => $row_result['error_message'] ?? 'Document not found',
+                                'data'    => $row_data,
+                            ];
+                        }
+                        
+                        $results['details'][] = $row_result;
+                    }
+                    
+                    $results['processed_rows']++;
+                    
+                } catch ( \Exception $e ) {
                     $results['errors'][] = [
                         'row'     => $row_number,
-                        'message' => $row_result->get_error_message(),
+                        'message' => 'Unexpected error: ' . $e->getMessage(),
                         'data'    => $row_data,
                     ];
                     $results['failed_tags']++;
-                } else {
-                    $results['successful_tags'] += $row_result['tags_applied'];
-                    $results['documents_found'] += $row_result['documents_found'];
-                    $results['documents_not_found'] += $row_result['documents_not_found'];
-                    
-                    // Add detailed information for debugging
-                    if ( isset( $row_result['documents_not_found'] ) && $row_result['documents_not_found'] > 0 ) {
-                        $results['errors'][] = [
-                            'row'     => $row_number,
-                            'message' => $row_result['error_message'] ?? 'Document not found',
-                            'data'    => $row_data,
-                        ];
-                    }
-                    
-                    $results['details'][] = $row_result;
                 }
-                
-                $results['processed_rows']++;
-                
-            } catch ( \Exception $e ) {
-                $results['errors'][] = [
-                    'row'     => $row_number,
-                    'message' => 'Unexpected error: ' . $e->getMessage(),
-                    'data'    => $row_data,
-                ];
-                $results['failed_tags']++;
+            }
+            
+            // After each batch, flush output and reset time limit
+            // This helps prevent timeouts and allows progress tracking
+            if ( function_exists( 'fastcgi_finish_request' ) ) {
+                // For FastCGI, flush output buffer
+                @ob_flush();
+                @flush();
+            } else {
+                // For other SAPI, try to flush
+                @ob_flush();
+                @flush();
+            }
+            
+            // Reset execution time after each batch to prevent timeout
+            if ( $batch_index < count( $batches ) - 1 ) {
+                set_time_limit( 600 ); // Reset to 10 minutes for next batch
+                // Also clear any object cache to free memory
+                if ( function_exists( 'wp_cache_flush_group' ) ) {
+                    wp_cache_flush_group( 'posts' );
+                }
             }
         }
 

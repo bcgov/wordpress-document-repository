@@ -1083,10 +1083,15 @@ class RestApiController {
     public function process_csv_bulk_upload( WP_REST_Request $request ) {
         try {
             // Increase execution time and memory limit for large CSV processing
-            set_time_limit( 300 ); // 5 minutes
+            set_time_limit( 600 ); // 10 minutes for large CSV files
             if ( function_exists( 'ini_set' ) ) {
-                @ini_set( 'max_execution_time', '300' );
+                @ini_set( 'max_execution_time', '600' );
                 @ini_set( 'memory_limit', '512M' );
+            }
+            
+            // Disable output buffering for progress tracking
+            if ( ob_get_level() ) {
+                @ob_end_clean();
             }
             
             // Verify nonce for file upload.

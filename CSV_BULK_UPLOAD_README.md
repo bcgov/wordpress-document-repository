@@ -125,6 +125,7 @@ The system provides detailed error reporting:
 - **Encoding**: UTF-8 recommended
 - **Processing**: Server-side processing with progress tracking
 - **Security**: Nonce verification and permission checks
+- **Large Files**: For CSV files with 1000+ rows, consider splitting into smaller files (500-1000 rows each) to avoid timeout issues
 
 ## API Endpoints
 
