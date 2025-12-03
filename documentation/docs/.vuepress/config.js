@@ -3,12 +3,12 @@ import { defineUserConfig } from "vuepress";
 import { searchPlugin } from "@vuepress/plugin-search";
 import { viteBundler } from "@vuepress/bundler-vite";
 
+
 export default defineUserConfig({
-  base: "/wordpress-document-repository/",
-  lang: "en-US",
   title: "WordPress Document Repository",
-  description:
-    "A WordPress plugin to manage and display documents stored in a repository.",
+  base: "/wordpress-document-repository/",
+  description: "A WordPress plugin to manage and display documents stored in a repository.",
+  lang: "en-US",
   bundler: viteBundler(),
   theme: defaultTheme({
     logo: "/images/BCID_H_rgb_pos.png",
@@ -25,10 +25,6 @@ export default defineUserConfig({
       },
     ],
     sidebar: [
-      {
-        text: "Site Editor",
-        collapsible: true,
-        children: [
           {
             text: "Metadata Settings",
             link: "/guide/SiteEditor/metadata-settings",
@@ -41,8 +37,6 @@ export default defineUserConfig({
             text: "Public Display Feature",
             link: "/guide/SiteEditor/public-display-feature",
           },
-        ],
-      },
     ],
   }),
   plugins: [
