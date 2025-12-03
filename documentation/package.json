@@ -1,0 +1,30 @@
+{
+  "name": "documentation",
+  "version": "1.0.0",
+  "description": "Documentation for the WordPress Document Repository",
+  "keywords": [
+    "document",
+    "WordPress",
+    "repository"
+  ],
+  "homepage": "https://github.com/bcgov/wordpress-document-repository#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bcgov/wordpress-document-repository.git"
+  },
+  "license": "GPL-2.0-or-later",
+  "author": "govwordpress@gov.bc.ca",
+  "main": "index.js",
+  "scripts": {
+    "docs:build": "vuepress build docs",
+    "docs:dev": "vuepress dev docs"
+  },
+  "devDependencies": {
+    "@vuepress/bundler-vite": "^2.0.0-rc.7",
+    "@vuepress/plugin-search": "^2.0.0-rc.80",
+    "@vuepress/theme-default": "^2.0.0-rc.11",
+    "sass-embedded": "^1.93.3",
+    "vue": "^3.4.0",
+    "vuepress": "^2.0.0-rc.7"
+  }
+}
