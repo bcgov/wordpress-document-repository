@@ -1,41 +1,36 @@
 name: Deploy to GitHub pages
-
 on:
-  # trigger deployment on every push to main branch
+  # allow manual deployment from the Actions tab
+  workflow_dispatch:
   push:
     branches:
       - main
-  # trigger deployment manually
-  workflow_dispatch:
-  # trigger deployment on new release publication
   release:
     types:
       - published
-
-# allow the action to deploy to gh-pages
-permissions:
-  contents: write
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          # fetch all commits to get last updated time or other git log info
-          fetch-depth: 0
+          node-version: 22
+          cache: npm
 
       - name: Install and Build 🔧
         run: |
           cd documentation
-          npm ci
+          npm install
           npm run docs:build
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: gh-pages # The branch the action should deploy to.
-          folder: documentation/docs/.vuepress/dist # The folder the action should deploy.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages # The branch the action should deploy to.
+          FOLDER: documentation/docs/.vuepress/dist # The folder the action should deploy.
+          CLEAN: true # Automatically remove deleted files from the deploy branch
+          CLEAN_EXCLUDE: '["version"]'
