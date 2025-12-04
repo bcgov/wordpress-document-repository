@@ -532,12 +532,9 @@ const useMetadataManagement = ( {
 					const original = localDocuments.find(
 						( doc ) => doc.id.toString() === docId
 					);
-					if ( ! original ) return false;
-					// Check title
-					const origTitle = original.title ?? '';
-					const editTitle = edited.title ?? '';
-					const titleChanged =
-						String( origTitle ) !== String( editTitle );
+					if ( ! original ) {
+						return false;
+					}
 					// Check metadata fields
 					const metadataChanged = metadataFields.some( ( field ) => {
 						const origVal = original.metadata?.[ field.id ] ?? '';
