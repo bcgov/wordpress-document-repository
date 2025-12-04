@@ -8,5 +8,3 @@ permissions:
 jobs:
   php-validation:
     uses: bcgov/des-git-workflows/.github/workflows/phpcs-validate.yml@1.1.0
-    with:
-      node_version: '24'
