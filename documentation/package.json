@@ -12,6 +12,9 @@
     "type": "git",
     "url": "git+https://github.com/bcgov/wordpress-document-repository.git"
   },
+  "engines": {
+    "node": ">=24.11.0"
+  },
   "license": "GPL-2.0-or-later",
   "author": "govwordpress@gov.bc.ca",
   "main": "index.js",

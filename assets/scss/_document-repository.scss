@@ -6,7 +6,7 @@
  * Document Repository Styles
  *
  * This file contains styles for the Document Repository interface.
- * It includes styles for the document list, table, and various UI components 
+ * It includes styles for the document list, table, and various UI components
  * used throughout the application.
  */
 
@@ -144,15 +144,15 @@
 		text-align: center;
 		padding: $spacing-xl;
 		color: $color-text-light;
-		
+
 		.components-spinner {
 			margin: 0 auto $spacing-md;
 		}
-		
+
 		p {
 			margin: $spacing-sm 0;
 		}
-		
+
 		.loading-description {
 			font-size: $font-size-sm;
 			opacity: 0.8;
@@ -255,7 +255,7 @@
 	margin-bottom: $spacing-xl;
 	padding: $spacing-sm;
 	align-items: stretch;
-	
+
 	// Document list actions
 	.document-list-actions {
 		display: flex;
@@ -291,7 +291,7 @@
 		display: flex;
 		gap: $spacing-sm;
 	}
-	
+
 	// Pagination
 	.pagination {
 		display: flex;
