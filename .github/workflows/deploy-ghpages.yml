@@ -5,25 +5,19 @@ on:
   push:
     branches:
       - main
-      - feature/**
   release:
     types:
       - published
-
-permissions:
-  contents: write
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 🛎️
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
-          node-version: 22
-          cache: npm
+          node-version: "22.14.0"
 
       - name: Install and Build 🔧
         run: |
@@ -32,10 +26,10 @@ jobs:
           npm run docs:build
 
       - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@3.7.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: gh-pages # The branch the action should deploy to.
-          folder: documentation/docs/.vuepress/dist # The folder the action should deploy.
-          clean: true # Automatically remove deleted files from the deploy branch
-          clean-exclude: '["version"]'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages # The branch the action should deploy to.
+          FOLDER: documentation/docs/.vuepress/dist # The folder the action should deploy.
+          CLEAN: true # Automatically remove deleted files from the deploy branch
+          CLEAN_EXCLUDE: '["version"]'
