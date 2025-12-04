@@ -128,7 +128,7 @@ const App = () => {
 							}
 							throw new Error(
 								__(
-									'Failed to fetch metadata fields:',
+									'Failed to fetch metadata fields: ',
 									'bcgov-design-system'
 								) + errorMessage
 							);
