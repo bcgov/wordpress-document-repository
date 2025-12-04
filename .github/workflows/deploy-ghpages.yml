@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - release/**
+      - feature/**
   release:
     types:
       - published
