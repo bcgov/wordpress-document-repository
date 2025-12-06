@@ -92,9 +92,9 @@ Effect:
 
 - New fields appear as columns in both views.
 - Enter or edit values per document in **standard** or **spreadsheet** mode.
-- Search/sort by:
+- Search by:
   - **Text**: match text strings.
-  - **Date**: sort/filter by date.
+  - **Date**: filter by date.
   - **Taxonomy**: filter by selected terms.
 
 ![Using a Metadata Field](/images/metadata-using-dates.gif)
