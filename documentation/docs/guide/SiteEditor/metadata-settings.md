@@ -31,7 +31,7 @@ Each metadata field includes:
 - **Description**: Optional helper text.
 - **Taxonomy Terms** (required when type is Taxonomy): A list of categories, one per line. For example, if a document repository is used by a Zoo, the taxonomy could be Animals: Ape, Bear, Coyote. The taxonomy is Animals, and the terms are Ape, Bear, Coyote.
 
-![Metadata Field Form](/images/metadata-field-form.jpg)
+![Metadata Field Form](/images/metadata-fields-form.jpg)
 
 Notes:
 
@@ -51,10 +51,11 @@ Notes:
    - **Date**: date value.
    - **Taxonomy**: pick from predefined terms.
 5. (Taxonomy only) Enter **Taxonomy Terms** as a list, one line per term.
-6. Optionally add a **Description**.
-7. Click **Save**.
+6. (Taxonomy only) Check **Multiple Choice** to allow selecting multiple taxonomy terms.
+7. Optionally add a **Description**.
+8. Click **Save**.
 
-![Add Metadata Field](/images/metadata-add-field.gif)
+![Add Metadata Field](/images/metadata-add-field-taxonomy.gif)
 
 ---
 
@@ -66,7 +67,7 @@ Notes:
 - Taxonomy terms can be modified but not fully removed; keep at least one term.
 - Save changes. Existing documents keep their prior values until each document is edited (standard or spreadsheet mode).
 
-> **Add demo GIF here** (editing a field)
+![Edit Metadata Field](/images/metadata-edit-field-taxonomy.gif)
 
 ---
 
@@ -83,7 +84,7 @@ Effect:
 - The field (column) disappears from both standard and spreadsheet views.
 - All stored values for that field are removed.
 
-> **Add demo GIF here** (deleting a field)
+![Delete Metadata Field](/images/metadata-delete-field-taxonomy.gif)
 
 ---
 
@@ -96,7 +97,8 @@ Effect:
   - **Date**: sort/filter by date.
   - **Taxonomy**: filter by selected terms.
 
-> **Add demo GIF here** (Saving changes to a field on the Document repository page)
+![Using a Metadata Field](/images/metadata-using-dates.gif)
+
 ---
 
 ## Tips & best practices
