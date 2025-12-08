@@ -35,7 +35,7 @@ Each metadata field includes:
 
 Notes:
 
-- Field type is chosen at creation and cannot be changed later. You must create a new Field.
+- Field type is chosen at creation and cannot be changed later. You must create a new field.
 - Text and Date fields may have empty values; Taxonomy fields require terms.
 - New fields apply to newly uploaded documents, but values remain blank until edited in standard or spreadsheet mode.
 
