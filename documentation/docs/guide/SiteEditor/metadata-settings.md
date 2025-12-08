@@ -126,5 +126,3 @@ Effect:
 - **Deletion**: Permanent and removes all values.
 - **Who can manage**: Admins or users with edit capability.
 - **Location**: Document Repository → Metadata Settings.
-
----
