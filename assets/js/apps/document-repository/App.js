@@ -54,7 +54,6 @@ const App = () => {
 		totalPages,
 		statusCounts,
 		fetchDocuments,
-		fetchAllDocuments,
 		deleteDocument,
 		trashDocument,
 		restoreDocument,
@@ -63,7 +62,10 @@ const App = () => {
 		error: documentsError,
 		setSearchParams,
 		searchTerm,
-		setSearchTerm,
+		searchInput,
+		setSearchInput,
+		performSearch,
+		handleSearchKeyPress,
 	} = useDocuments();
 
 	// Initialize data on component mount
@@ -254,7 +256,7 @@ const App = () => {
 	/**
 	 * Debounced document fetch
 	 *
-	 * Prevents rapid consecutive calls to fetchAllDocuments by delaying execution
+	 * Prevents rapid consecutive calls to fetchDocuments by delaying execution
 	 * until 1 second has passed without additional calls. Useful after bulk uploads
 	 * to avoid overloading the server and reduce timeout risk.
 	 *
@@ -262,16 +264,16 @@ const App = () => {
 	 */
 	const debouncedFetchDocuments = useMemo( () => {
 		let timer;
-		return ( ...args ) => {
+		return () => {
 			clearTimeout( timer );
 			timer = setTimeout( () => {
-				// Refresh cache after upload to include new documents
-				if ( fetchAllDocuments ) {
-					fetchAllDocuments( ...args );
+				// Refresh documents after upload to include new documents
+				if ( fetchDocuments ) {
+					fetchDocuments();
 				}
 			}, 1000 );
 		};
-	}, [ fetchAllDocuments ] );
+	}, [ fetchDocuments ] );
 
 	/**
 	 * Handle upload success and move to next file
@@ -465,7 +467,10 @@ const App = () => {
 					documentStatusFilter={ documentStatusFilter }
 					onStatusFilterChange={ setDocumentStatusFilter }
 					searchTerm={ searchTerm }
-					onSearchChange={ setSearchTerm }
+					searchInput={ searchInput }
+					setSearchInput={ setSearchInput }
+					performSearch={ performSearch }
+					handleSearchKeyPress={ handleSearchKeyPress }
 				/>
 
 				{ /* Upload Modal */ }

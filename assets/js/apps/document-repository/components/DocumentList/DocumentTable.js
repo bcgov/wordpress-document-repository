@@ -24,9 +24,11 @@ import DocumentTableRow from './DocumentTableRow';
  * @param {Function} props.onMetadataChange      - Callback when metadata is changed in spreadsheet mode
  * @param {Function} props.formatFileSize        - Function to format file size for display
  * @param {string}   props.documentStatusFilter  - Current status filter ('all', 'trash', etc.)
- * @param {string}   props.searchTerm            - Current search term
- * @param {Function} props.onSearchChange        - Callback when search term changes
- * @param {Function} props.onPageChange          - Callback when page changes
+ * @param {string}   props.searchTerm            - Current active search term
+ * @param {string}   props.searchInput           - Current search input value
+ * @param {Function} props.setSearchInput        - Setter for search input
+ * @param {Function} props.performSearch         - Execute search function
+ * @param {Function} props.handleSearchKeyPress  - Handle Enter key for search
  * @param {Function} props.toggleSpreadsheetMode - Callback to toggle spreadsheet mode
  * @param {boolean}  props.hasMetadataChanges    - Flag indicating if there are unsaved metadata changes
  * @param {Function} props.handleSaveBulkChanges - Callback to save bulk changes
@@ -49,8 +51,10 @@ function DocumentTable( {
 	formatFileSize,
 	documentStatusFilter,
 	searchTerm = '',
-	onSearchChange,
-	onPageChange,
+	searchInput = '',
+	setSearchInput,
+	performSearch,
+	handleSearchKeyPress,
 	toggleSpreadsheetMode,
 	hasMetadataChanges,
 	handleSaveBulkChanges,
@@ -112,20 +116,24 @@ function DocumentTable( {
 									'Search documents…',
 									'bcgov-design-system'
 								) }
-								value={ searchTerm }
-								onChange={ ( value ) => {
-									onSearchChange?.( value );
-									// Reset to page 1 when searching
-									onPageChange?.( 1 );
-								} }
+								value={ searchInput }
+								onChange={ setSearchInput }
+								onKeyPress={ handleSearchKeyPress }
 								className="document-search-input"
 							/>
+							<Button
+								className="document-search-button"
+								onClick={ performSearch }
+								disabled={ ! searchInput.trim() }
+							>
+								{ __( 'Search', 'bcgov-design-system' ) }
+							</Button>
 							{ searchTerm && (
 								<Button
 									className="document-search-clear"
 									onClick={ () => {
-										onSearchChange?.( '' );
-										onPageChange?.( 1 );
+										setSearchInput( '' );
+										performSearch();
 									} }
 									aria-label={ __(
 										'Clear search',
