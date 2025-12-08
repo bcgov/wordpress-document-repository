@@ -20,7 +20,8 @@
   "main": "index.js",
   "scripts": {
     "docs:build": "vuepress build docs",
-    "docs:dev": "vuepress dev docs"
+    "docs:dev": "vuepress dev docs",
+    "start": "npm run docs:dev"
   },
   "devDependencies": {
     "@vuepress/bundler-vite": "^2.0.0-rc.7",
