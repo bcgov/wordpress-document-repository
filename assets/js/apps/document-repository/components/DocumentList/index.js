@@ -47,8 +47,12 @@ import { default as useDocumentManagement } from './hooks/useDocumentManagement'
  * @param {Array}    props.statusCounts         - Array of number of documents of each status
  * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
  * @param {Function} props.onStatusFilterChange - Callback when filter changes
- * @param {string}   props.searchTerm           - Current search term
- * @param {Function} props.onSearchChange       - Callback when search term changes
+ * @param {string}   props.searchTerm           - Current active search term
+ * @param {string}   props.searchInput          - Current search input value
+ * @param {Function} props.setSearchInput       - Setter for search input
+ * @param {Function} props.performSearch        - Execute search function
+ * @param {Function} props.handleSearchKeyPress - Handle Enter key for search
+ * @param {boolean}  props.isLoading            - Whether documents are currently being loaded
  */
 const DocumentList = ( {
 	documents = [],
@@ -69,7 +73,11 @@ const DocumentList = ( {
 	documentStatusFilter = 'all',
 	onStatusFilterChange,
 	searchTerm = '',
-	onSearchChange,
+	searchInput = '',
+	setSearchInput,
+	performSearch,
+	handleSearchKeyPress,
+	isLoading = false,
 } ) => {
 	// Memoize formatFileSize function
 	const formatFileSize = useMemo(
@@ -204,8 +212,10 @@ const DocumentList = ( {
 			formatFileSize,
 			documentStatusFilter,
 			searchTerm,
-			onSearchChange,
-			onPageChange,
+			searchInput,
+			setSearchInput,
+			performSearch,
+			handleSearchKeyPress,
 			toggleSpreadsheetMode,
 			hasMetadataChanges,
 			handleSaveBulkChanges,
@@ -227,8 +237,10 @@ const DocumentList = ( {
 			setRestoreDocument,
 			documentStatusFilter,
 			searchTerm,
-			onSearchChange,
-			onPageChange,
+			searchInput,
+			setSearchInput,
+			performSearch,
+			handleSearchKeyPress,
 			toggleSpreadsheetMode,
 			hasMetadataChanges,
 			handleSaveBulkChanges,
@@ -398,6 +410,7 @@ const DocumentList = ( {
 					currentPage={ currentPage }
 					totalPages={ totalPages }
 					onPageChange={ onPageChange }
+					isLoading={ isLoading }
 				/>
 
 				{ showUploadFeedback && (
