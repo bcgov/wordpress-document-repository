@@ -1,6 +1,6 @@
 # Metadata Settings
 
-Use Metadata Settings to define the custom fields that appear on every document in the repository. These fields improve search, sorting, and filtering across both the standard and spreadsheet views.
+Use Metadata settings to define the custom fields that appear on every document in the repository. These fields improve search, sorting, and filtering across both the standard and spreadsheet views.
 
 ![Metadata Settings Overview:](/images/metadata-settings-overview.jpg)
 
