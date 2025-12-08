@@ -8,7 +8,6 @@ Use Metadata settings to define the custom fields that appear on every document 
 
 ## Prerequisites & Access
 
-- Design System theme installed and enabled.
 - Document Repository plugin installed and enabled.
 - Admins or users with edit capability can create, edit, and delete metadata fields.
 
