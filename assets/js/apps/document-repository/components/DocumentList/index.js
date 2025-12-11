@@ -52,6 +52,7 @@ import { default as useDocumentManagement } from './hooks/useDocumentManagement'
  * @param {Function} props.setSearchInput       - Setter for search input
  * @param {Function} props.performSearch        - Execute search function
  * @param {Function} props.handleSearchKeyPress - Handle Enter key for search
+ * @param {Function} props.setSearchParams      - Setter for search parameters
  * @param {boolean}  props.isLoading            - Whether documents are currently being loaded
  */
 const DocumentList = ( {
@@ -77,6 +78,7 @@ const DocumentList = ( {
 	setSearchInput,
 	performSearch,
 	handleSearchKeyPress,
+	setSearchParams,
 	isLoading = false,
 } ) => {
 	// Memoize formatFileSize function
@@ -216,6 +218,7 @@ const DocumentList = ( {
 			setSearchInput,
 			performSearch,
 			handleSearchKeyPress,
+			setSearchParams,
 			toggleSpreadsheetMode,
 			hasMetadataChanges,
 			handleSaveBulkChanges,
@@ -241,6 +244,7 @@ const DocumentList = ( {
 			setSearchInput,
 			performSearch,
 			handleSearchKeyPress,
+			setSearchParams,
 			toggleSpreadsheetMode,
 			hasMetadataChanges,
 			handleSaveBulkChanges,

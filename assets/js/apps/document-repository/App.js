@@ -471,6 +471,7 @@ const App = () => {
 					setSearchInput={ setSearchInput }
 					performSearch={ performSearch }
 					handleSearchKeyPress={ handleSearchKeyPress }
+					setSearchParams={ setSearchParams }
 				/>
 
 				{ /* Upload Modal */ }
