@@ -144,6 +144,7 @@
 		}
 	}
 
+	// Modern Search Bar Styles
 	&__search-header {
 		display: flex !important;
 		justify-content: space-between;
@@ -185,61 +186,103 @@
 				min-width: 15.625rem;
 				max-width: 25rem;
 				width: 100%;
+				display: flex;
+				gap: $spacing-sm;
+				align-items: stretch;
 
 				.document-search-input-wrapper {
-					position: relative;
-					width: 100%;
+					flex: 1;
+					display: flex;
+					align-items: center;
+					border: 1px solid $color-gray-300;
+					border-radius: $border-radius;
+					background-color: $color-white;
+					transition: border-color $transition-fast;
+					height: 36px;
+					box-sizing: border-box;
+					padding: 0 $spacing-sm 0 $spacing-md;
+
+					&:focus-within {
+						border-color: $color-primary;
+						box-shadow: 0 0 0 1px rgba($color-primary, 0.2);
+					}
 
 					.document-search-input {
+						flex: 1;
 						width: 100%;
-						visibility: visible !important;
-						display: block !important;
+						position: relative;
 
 						.components-base-control__field {
 							width: 100%;
 							visibility: visible !important;
 							position: relative;
+							margin: 0;
 						}
 
 						.components-text-control__input {
 							width: 100%;
 							visibility: visible !important;
 							display: block !important;
-							padding-right: 2.5rem; // Space for clear button
+							padding: 0;
+							border: none;
+							background: transparent;
+							height: auto;
+							line-height: 1.5;
+							box-sizing: border-box;
+							box-shadow: none;
+
+							&:focus {
+								border: none;
+								outline: none;
+								box-shadow: none;
+							}
+
+							&::placeholder {
+								color: $color-gray-500;
+							}
 						}
 					}
 
 					.document-search-clear {
-						position: absolute;
-						right: 0.625rem;
-						top: 50%;
-						transform: translateY(-50%);
 						display: flex;
 						align-items: center;
 						justify-content: center;
 						padding: 0;
-						min-width: 1.5rem;
 						width: 1.5rem;
 						height: 1.5rem;
+						min-width: 1.5rem;
+						min-height: 1.5rem;
 						background: transparent;
 						border: none;
 						cursor: pointer;
 						color: $color-gray-600;
-						z-index: 10;
 						margin: 0;
+						flex-shrink: 0;
+						box-sizing: border-box;
 
 						&:hover {
 							color: $color-gray-900;
 						}
 
 						svg {
-							width: 1.25rem;
-							height: 1.25rem;
+							width: 1rem;
+							height: 1rem;
 							display: block;
 							margin: 0;
 							padding: 0;
 						}
 					}
+				}
+
+				.document-search-button {
+					flex-shrink: 0;
+					height: 36px;
+					min-height: 36px;
+					padding: $spacing-xs $spacing-md;
+					white-space: nowrap;
+					box-sizing: border-box;
+					display: inline-flex;
+					align-items: center;
 				}
 			}
 		}

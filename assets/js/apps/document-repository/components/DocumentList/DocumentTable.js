@@ -29,6 +29,7 @@ import DocumentTableRow from './DocumentTableRow';
  * @param {Function} props.setSearchInput        - Setter for search input
  * @param {Function} props.performSearch         - Execute search function
  * @param {Function} props.handleSearchKeyPress  - Handle Enter key for search
+ * @param {Function} props.setSearchParams       - Setter for search parameters
  * @param {Function} props.toggleSpreadsheetMode - Callback to toggle spreadsheet mode
  * @param {boolean}  props.hasMetadataChanges    - Flag indicating if there are unsaved metadata changes
  * @param {Function} props.handleSaveBulkChanges - Callback to save bulk changes
@@ -55,6 +56,7 @@ function DocumentTable( {
 	setSearchInput,
 	performSearch,
 	handleSearchKeyPress,
+	setSearchParams,
 	toggleSpreadsheetMode,
 	hasMetadataChanges,
 	handleSaveBulkChanges,
@@ -121,19 +123,18 @@ function DocumentTable( {
 								onKeyPress={ handleSearchKeyPress }
 								className="document-search-input"
 							/>
-							<Button
-								className="document-search-button"
-								onClick={ performSearch }
-								disabled={ ! searchInput.trim() }
-							>
-								{ __( 'Search', 'bcgov-design-system' ) }
-							</Button>
-							{ searchTerm && (
-								<Button
+							{ ( searchTerm || searchInput ) && (
+								<button
 									className="document-search-clear"
 									onClick={ () => {
+										// Always reset search completely
+										setSearchParams( ( prev ) => ( {
+											...prev,
+											search: '',
+											page: 1,
+										} ) );
+
 										setSearchInput( '' );
-										performSearch();
 									} }
 									aria-label={ __(
 										'Clear search',
@@ -147,17 +148,38 @@ function DocumentTable( {
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
 										viewBox="0 0 24 24"
-										width="20"
-										height="20"
+										width="16"
+										height="16"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
 									>
-										<path
-											d="M12 13.06l3.712 3.713 1.061-1.06L13.06 12l3.713-3.712-1.06-1.06L12 10.94 8.288 7.228l-1.06 1.06L10.94 12l-3.712 3.712 1.06 1.061L12 13.06z"
-											fill="currentColor"
-										/>
+										<line
+											x1="18"
+											y1="6"
+											x2="6"
+											y2="18"
+										></line>
+										<line
+											x1="6"
+											y1="6"
+											x2="18"
+											y2="18"
+										></line>
 									</svg>
-								</Button>
+								</button>
 							) }
 						</div>
+						<Button
+							className="document-search-button"
+							variant="primary"
+							onClick={ performSearch }
+							disabled={ ! searchInput.trim() }
+						>
+							{ __( 'Search', 'bcgov-design-system' ) }
+						</Button>
 					</div>
 				</div>
 			</div>

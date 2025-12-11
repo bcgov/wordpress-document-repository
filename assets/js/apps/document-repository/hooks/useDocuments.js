@@ -125,6 +125,22 @@ export const useDocuments = () => {
 	}, [ searchParams.page ] );
 
 	// ===================================================================
+	// Keep searchTerm synchronized with searchParams.search
+	// ===================================================================
+	useEffect( () => {
+		setSearchTerm( searchParams.search || '' );
+	}, [ searchParams.search ] );
+
+	// ===================================================================
+	// Initialize search input from searchParams
+	// ===================================================================
+	useEffect( () => {
+		if ( searchParams.search ) {
+			setSearchInput( searchParams.search );
+		}
+	}, [ searchParams.search ] );
+
+	// ===================================================================
 	// Manual search function
 	// ===================================================================
 	const performSearch = useCallback( () => {
