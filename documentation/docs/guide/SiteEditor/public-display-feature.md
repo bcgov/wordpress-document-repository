@@ -22,7 +22,7 @@ In WordPress Admin: **Documents** (left nav) → **All Documents**.
 ## What you can do
 
 - Add New Documents: this adds a new document **Post** only. (see note below)
-- View and filter taxonomy columns (e.g., **Numbers**, **Zoo**).
+- View and filter taxonomy columns (e.g.,  **Zoo Animals**).
 - Edit title, excerpt, and metadata fields.
 - Add, edit, or remove taxonomy terms.
 - Search, filter, trash, restore, or delete Documents.
@@ -33,7 +33,7 @@ In WordPress Admin: **Documents** (left nav) → **All Documents**.
 
 ## Filter taxonomy columns
 
-- Custom taxonomies appear as columns (e.g., **Numbers**, **Zoo**) for quick scanning.
+- Custom taxonomies appear as columns (e.g., **Zoo Animals**) for quick scanning.
 - Columns can be sorted and filtered (where supported).
 
 _Filtering Documents By Taxonomy Term:_
@@ -55,7 +55,7 @@ _Edit Document Metadata:_
 
 ## Manage taxonomy terms
 
-1. Go to **Documents → {Taxonomy}** (e.g., Category, Zoo, Numbers).
+1. Go to **Documents → {Taxonomy}** (e.g., **Zoo Animals**).
 2. **Add New Term**: enter `Name`, `Slug`, `Description`, then click **Add New {term}**.
 3. **Edit Term**: click a term, update `Name`, `Slug`, `Description`, then click **Update** (or **Delete** to remove).
 
@@ -78,4 +78,4 @@ _Trash & restore:_
 
 - Documents are publicly queryable unless trashed.
 - Document attachments are hidden from the global Media Library.
-- Configure **Metadata Settings** to choose which taxonomy columns appear (e.g., **Numbers**, **Zoo**).
+- Configure **Metadata Settings** to choose which taxonomy columns appear (e.g., **Zoo Animals**).
