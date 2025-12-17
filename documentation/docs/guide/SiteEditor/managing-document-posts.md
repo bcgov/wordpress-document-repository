@@ -1,4 +1,4 @@
-# Document Post Type (Documents)
+# Managing Document Posts
 
 The **Documents** post type stores repository documents with custom metadata and taxonomy terms.
 
@@ -7,6 +7,7 @@ The **Documents** post type stores repository documents with custom metadata and
 ## Prerequisites
 
 - **Document Repository** plugin installed and enabled.
+- WordPress Search plugin installed and enabled (to search document metadata).
 - Admins or users with edit capability can manage Documents.
 
 ---

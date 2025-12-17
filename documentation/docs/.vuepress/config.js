@@ -34,8 +34,8 @@ export default defineUserConfig({
             link: "/guide/SiteEditor/document-repository-feature",
           },
           {
-            text: "Public Display Feature",
-            link: "/guide/SiteEditor/public-display-feature",
+            text: "Managing Document Posts",
+            link: "/guide/SiteEditor/managing-document-posts",
           },
     ],
   }),
