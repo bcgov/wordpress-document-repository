@@ -193,6 +193,40 @@ const useMetadataManagement = ( {
 					document.metadata?.upload_date,
 			};
 
+			/**
+			 * Convert term name/label to ID for SelectControl compatibility
+			 * @param {string|number} termValue - The term value (name or ID)
+			 * @param {Array}         options   - Field options array
+			 * @return {string|number} - The term ID or original value if not found
+			 */
+			const convertTermNameToId = ( termValue, options ) => {
+				// If already an ID (numeric), return as is
+				if (
+					typeof termValue === 'number' ||
+					( typeof termValue === 'string' &&
+						/^\d+$/.test( termValue ) )
+				) {
+					return termValue;
+				}
+				// Find matching option by name/label
+				const option = options.find(
+					( opt ) =>
+						( typeof opt === 'string' && opt === termValue ) ||
+						( typeof opt === 'object' &&
+							( opt.name === termValue ||
+								opt.label === termValue ) )
+				);
+				// If no option found, return original value
+				if ( ! option ) {
+					return termValue;
+				}
+				// If option is an object, return value or id; otherwise return option itself
+				if ( typeof option === 'object' ) {
+					return option.value || option.id;
+				}
+				return option;
+			};
+
 			// Initialize edited values with current metadata, preserving case
 			// For taxonomy fields marked `multiple`, coerce stored values into
 			// an array so the UI (token fields / multi-select) always receives
@@ -211,7 +245,24 @@ const useMetadataManagement = ( {
 					} else {
 						coerced = [];
 					}
+					// Convert term names to IDs for SelectControl compatibility
+					if ( field.options && field.options.length > 0 ) {
+						coerced = coerced.map( ( termValue ) =>
+							convertTermNameToId( termValue, field.options )
+						);
+					}
 					initialValues[ field.id ] = coerced;
+				} else if ( field.type === 'taxonomy' ) {
+					// Single select taxonomy - convert term name to ID
+					const val = document.metadata?.[ field.id ] ?? '';
+					if ( val && field.options && field.options.length > 0 ) {
+						initialValues[ field.id ] = convertTermNameToId(
+							val,
+							field.options
+						);
+					} else {
+						initialValues[ field.id ] = val;
+					}
 				} else {
 					initialValues[ field.id ] =
 						document.metadata?.[ field.id ] ?? '';
@@ -368,6 +419,7 @@ const useMetadataManagement = ( {
 			// Prepare API calls
 			const calls = [];
 			const putData = {};
+			let updatedDocument = null;
 
 			// Update title if it changed
 			if ( titleChanged ) {
@@ -386,6 +438,10 @@ const useMetadataManagement = ( {
 						path: `/${ apiNamespace }/documents/${ editingMetadata.id }`,
 						method: 'PUT',
 						data: putData,
+					} ).then( ( response ) => {
+						// Store the updated document response for later use
+						updatedDocument = response;
+						return response;
 					} )
 				);
 			}
@@ -397,6 +453,10 @@ const useMetadataManagement = ( {
 						path: `/${ apiNamespace }/documents/${ editingMetadata.id }/metadata`,
 						method: 'POST',
 						data: metadataToUpdate,
+					} ).then( ( response ) => {
+						// Store the updated document response for later use (metadata endpoint takes precedence)
+						updatedDocument = response;
+						return response;
 					} )
 				);
 			}
@@ -404,48 +464,38 @@ const useMetadataManagement = ( {
 			// Execute all API calls
 			await Promise.all( calls );
 
-			// Update local documents
-			setLocalDocuments( ( prev ) =>
-				prev.map( ( doc ) =>
-					doc.id === editingMetadata.id
-						? {
-								...doc,
-								title: titleChanged
-									? editedValues.title
-									: doc.title,
-								metadata: {
-									...doc.metadata,
-									...metadataToUpdate,
-								},
-								excerpt: excerptChanged
-									? editedValues.excerpt
-									: doc.excerpt,
-						  }
-						: doc
-				)
+			// Use the updated document from API response if available, otherwise fall back to local updates
+			const finalDocument = updatedDocument || {
+				id: editingMetadata.id,
+				title: titleChanged
+					? editedValues.title
+					: editingMetadata.title,
+				metadata: {
+					...editingMetadata.metadata,
+					...metadataToUpdate,
+				},
+				excerpt: excerptChanged
+					? editedValues.excerpt
+					: editingMetadata.excerpt,
+			};
+
+			// Update local documents with the response from the server
+			const updatedDocuments = localDocuments.map( ( doc ) =>
+				doc.id === editingMetadata.id
+					? {
+							...doc,
+							title: finalDocument.title ?? doc.title,
+							metadata: finalDocument.metadata ?? doc.metadata,
+							excerpt: finalDocument.excerpt ?? doc.excerpt,
+					  }
+					: doc
 			);
+
+			setLocalDocuments( updatedDocuments );
 
 			// Update parent component if needed
 			if ( typeof onUpdateDocuments === 'function' ) {
-				onUpdateDocuments(
-					localDocuments.map( ( doc ) =>
-						doc.id === editingMetadata.id
-							? {
-									...doc,
-									title: titleChanged
-										? editedValues.title
-										: doc.title,
-									metadata: {
-										...doc.metadata,
-										...metadataToUpdate,
-									},
-									excerpt: excerptChanged
-										? editedValues.excerpt
-										: doc.excerpt,
-							  }
-							: doc
-					)
-				);
+				onUpdateDocuments( updatedDocuments );
 			}
 
 			// Reset editing state
