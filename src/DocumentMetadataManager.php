@@ -476,12 +476,22 @@ class DocumentMetadataManager {
                     // Handle both single values and arrays.
                     $terms = is_array( $value ) ? $value : [ $value ];
 
-                    // Convert term names to IDs for wp_set_object_terms.
+                    // Convert term names or IDs to term IDs for wp_set_object_terms.
                     $term_ids = [];
-                    foreach ( $terms as $term_name ) {
-                        $term_obj = get_term_by( 'name', $term_name, $taxonomy_name );
-                        if ( $term_obj && ! is_wp_error( $term_obj ) ) {
-                            $term_ids[] = $term_obj->term_id;
+                    foreach ( $terms as $term_value ) {
+                        // Check if the value is numeric (likely an ID).
+                        if ( is_numeric( $term_value ) ) {
+                            // Try to get term by ID first.
+                            $term_obj = get_term( (int) $term_value, $taxonomy_name );
+                            if ( $term_obj && ! is_wp_error( $term_obj ) ) {
+                                $term_ids[] = $term_obj->term_id;
+                            }
+                        } else {
+                            // Try to get term by name.
+                            $term_obj = get_term_by( 'name', $term_value, $taxonomy_name );
+                            if ( $term_obj && ! is_wp_error( $term_obj ) ) {
+                                $term_ids[] = $term_obj->term_id;
+                            }
                         }
                     }
 
