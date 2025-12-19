@@ -13,7 +13,7 @@ import MetadataModal from '../../../shared/components/MetadataModal';
 import UploadArea from './UploadArea';
 import PaginationControls from './PaginationControls';
 import RetryNotice from './RetryNotice';
-import MultipleSelectChip from '../../../shared/components/MultipleSelectChip';
+import TaxonomyTokenField from '../../../shared/components/TaxonomyTokenField';
 import { isAllView, isTrashView } from '../../utils/documentStatus';
 
 // Import custom hooks
@@ -737,7 +737,7 @@ const DocumentList = ( {
 												}
 
 												inputElement = (
-													<MultipleSelectChip
+													<TaxonomyTokenField
 														id={ field.id }
 														label={ field.label }
 														value={ valueArray }
@@ -753,7 +753,7 @@ const DocumentList = ( {
 															)
 														}
 														placeholder={ __(
-															'Select options…',
+															'Type to search or select…',
 															'bcgov-design-system'
 														) }
 														required={

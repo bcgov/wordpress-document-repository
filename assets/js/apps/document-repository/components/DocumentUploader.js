@@ -39,7 +39,7 @@ import {
 	Spinner,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
-import MultipleSelectChip from '../../shared/components/MultipleSelectChip';
+import TaxonomyTokenField from '../../shared/components/TaxonomyTokenField';
 
 /**
  * State Management
@@ -465,7 +465,7 @@ const DocumentUploader = ( {
 					}
 
 					return (
-						<MultipleSelectChip
+						<TaxonomyTokenField
 							key={ id }
 							id={ id }
 							label={ fieldLabel }
@@ -475,7 +475,7 @@ const DocumentUploader = ( {
 								handleMetadataChange( id, selectedValues )
 							}
 							placeholder={ __(
-								'Select options…',
+								'Type to search or select…',
 								'bcgov-design-system'
 							) }
 							required={ required }

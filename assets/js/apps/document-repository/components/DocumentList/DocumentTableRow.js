@@ -6,7 +6,7 @@ import {
 	SelectControl,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
-import MultipleSelectChip from '../../../shared/components/MultipleSelectChip';
+import TaxonomyTokenField from '../../../shared/components/TaxonomyTokenField';
 import { isTrashView } from '../../utils/documentStatus';
 import { highlightSearchTerm } from '../../utils/searchUtils';
 
@@ -135,7 +135,7 @@ function DocumentTableRow( {
 					valueArray = [];
 				}
 				return (
-					<MultipleSelectChip
+					<TaxonomyTokenField
 						id={ `${ document.id }-${ field.id }` }
 						value={ valueArray }
 						options={ field.options || [] }
@@ -147,7 +147,7 @@ function DocumentTableRow( {
 							)
 						}
 						placeholder={ __(
-							'Select options…',
+							'Type to search or select…',
 							'bcgov-design-system'
 						) }
 					/>
