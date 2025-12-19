@@ -547,11 +547,95 @@ const useMetadataManagement = ( {
 	const toggleSpreadsheetMode = useCallback(
 		( enabled ) => {
 			if ( enabled ) {
+				/**
+				 * Convert term name/label to ID for SelectControl compatibility
+				 * @param {string|number} termValue - The term value (name or ID)
+				 * @param {Array}         options   - Field options array
+				 * @return {string|number} - The term ID or original value if not found
+				 */
+				const convertTermNameToId = ( termValue, options ) => {
+					// If already an ID (numeric), return as is
+					if (
+						typeof termValue === 'number' ||
+						( typeof termValue === 'string' &&
+							/^\d+$/.test( termValue ) )
+					) {
+						return termValue;
+					}
+					// Find matching option by name/label
+					const option = options.find(
+						( opt ) =>
+							( typeof opt === 'string' && opt === termValue ) ||
+							( typeof opt === 'object' &&
+								( opt.name === termValue ||
+									opt.label === termValue ) )
+					);
+					// If no option found, return original value
+					if ( ! option ) {
+						return termValue;
+					}
+					// If option is an object, return value or id; otherwise return option itself
+					if ( typeof option === 'object' ) {
+						return option.value || option.id;
+					}
+					return option;
+				};
+
 				// Initialize bulk edit metadata when entering spreadsheet mode
 				const initialBulkMetadata = {};
 				localDocuments.forEach( ( doc ) => {
+					const normalizedMetadata = {};
+
+					// Normalize taxonomy fields to use IDs instead of names
+					metadataFields.forEach( ( field ) => {
+						if ( field.type === 'taxonomy' ) {
+							const val = doc.metadata?.[ field.id ];
+							if ( field.multiple ) {
+								// Multi-select: convert array of names to array of IDs
+								let coerced;
+								if ( Array.isArray( val ) ) {
+									coerced = val;
+								} else if ( val ) {
+									coerced = [ val ];
+								} else {
+									coerced = [];
+								}
+								// Convert term names to IDs
+								if (
+									field.options &&
+									field.options.length > 0
+								) {
+									normalizedMetadata[ field.id ] =
+										coerced.map( ( termValue ) =>
+											convertTermNameToId(
+												termValue,
+												field.options
+											)
+										);
+								} else {
+									normalizedMetadata[ field.id ] = coerced;
+								}
+							} else if (
+								val &&
+								field.options &&
+								field.options.length > 0
+							) {
+								// Single select: convert name to ID
+								normalizedMetadata[ field.id ] =
+									convertTermNameToId( val, field.options );
+							} else {
+								// Single select: use value as-is or empty string
+								normalizedMetadata[ field.id ] = val || '';
+							}
+						} else {
+							// Non-taxonomy fields: use as-is
+							normalizedMetadata[ field.id ] =
+								doc.metadata?.[ field.id ] ?? '';
+						}
+					} );
+
 					initialBulkMetadata[ doc.id ] = {
-						...( doc.metadata || {} ),
+						...normalizedMetadata,
 						excerpt: doc.excerpt || '', // Include excerpt in initial state
 					};
 				} );
@@ -564,7 +648,7 @@ const useMetadataManagement = ( {
 				dispatch( { type: 'EXIT_SPREADSHEET_MODE' } );
 			}
 		},
-		[ localDocuments ]
+		[ localDocuments, metadataFields ]
 	);
 
 	/**

@@ -4,7 +4,6 @@ import {
 	SelectControl,
 	TextControl,
 	TextareaControl,
-	FormTokenField,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import ErrorBoundary from './ErrorBoundary';
@@ -14,6 +13,7 @@ import MetadataModal from '../../../shared/components/MetadataModal';
 import UploadArea from './UploadArea';
 import PaginationControls from './PaginationControls';
 import RetryNotice from './RetryNotice';
+import MultipleSelectChip from '../../../shared/components/MultipleSelectChip';
 import { isAllView, isTrashView } from '../../utils/documentStatus';
 
 // Import custom hooks
@@ -724,7 +724,7 @@ const DocumentList = ( {
 
 										if ( field.type === 'taxonomy' ) {
 											if ( field.multiple ) {
-												// Coerce edited value into an array for the token field.
+												// Coerce edited value into an array for the multi-select field.
 												let valueArray;
 												const raw =
 													editedValues[ field.id ];
@@ -737,28 +737,28 @@ const DocumentList = ( {
 												}
 
 												inputElement = (
-													<FormTokenField
+													<MultipleSelectChip
 														id={ field.id }
+														label={ field.label }
 														value={ valueArray }
-														suggestions={ (
+														options={
 															field.options || []
-														).map( ( option ) =>
-															typeof option ===
-															'string'
-																? option
-																: option.label ||
-																  option.name
-														) }
-														onChange={ ( tokens ) =>
+														}
+														onChange={ (
+															selectedValues
+														) =>
 															updateEditedField(
 																field.id,
-																tokens
+																selectedValues
 															)
 														}
 														placeholder={ __(
-															'Add or select…',
+															'Select options…',
 															'bcgov-design-system'
 														) }
+														required={
+															field.required
+														}
 													/>
 												);
 											} else {
