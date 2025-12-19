@@ -740,6 +740,7 @@ const DocumentList = ( {
 													<FormTokenField
 														id={ field.id }
 														value={ valueArray }
+                                                        __experimentalExpandOnFocus="true"
 														suggestions={ (
 															field.options || []
 														).map( ( option ) =>

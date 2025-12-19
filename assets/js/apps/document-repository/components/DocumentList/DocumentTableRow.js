@@ -145,6 +145,7 @@ function DocumentTableRow( {
 					<FormTokenField
 						value={ valueArray }
 						suggestions={ suggestions }
+                        __experimentalExpandOnFocus="true"
 						onChange={ ( tokens ) =>
 							onMetadataChange( document.id, field.id, tokens )
 						}
