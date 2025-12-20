@@ -4,9 +4,9 @@ import {
 	TextControl,
 	TextareaControl,
 	SelectControl,
-	FormTokenField,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
+import TaxonomyTokenField from '../../../shared/components/TaxonomyTokenField';
 import { isTrashView } from '../../utils/documentStatus';
 import { highlightSearchTerm } from '../../utils/searchUtils';
 
@@ -125,13 +125,6 @@ function DocumentTableRow( {
 			bulkEditedMetadata?.[ document.id ]?.[ field.id ] || '';
 
 		if ( field.type === 'taxonomy' ) {
-			const suggestions = ( field.options || [] ).map( ( option ) =>
-				// Handle both old format (string) and new format (object with id/name)
-				typeof option === 'string'
-					? option
-					: option.label || option.name
-			);
-
 			if ( field.multiple ) {
 				let valueArray;
 				if ( Array.isArray( fieldValue ) ) {
@@ -142,19 +135,31 @@ function DocumentTableRow( {
 					valueArray = [];
 				}
 				return (
-					<FormTokenField
+					<TaxonomyTokenField
+						id={ `${ document.id }-${ field.id }` }
 						value={ valueArray }
-						suggestions={ suggestions }
-						onChange={ ( tokens ) =>
-							onMetadataChange( document.id, field.id, tokens )
+						options={ field.options || [] }
+						onChange={ ( selectedValues ) =>
+							onMetadataChange(
+								document.id,
+								field.id,
+								selectedValues
+							)
 						}
 						placeholder={ __(
-							'Add or select…',
+							'Type to search or select…',
 							'bcgov-design-system'
 						) }
 					/>
 				);
 			}
+
+			const suggestions = ( field.options || [] ).map( ( option ) =>
+				// Handle both old format (string) and new format (object with id/name)
+				typeof option === 'string'
+					? option
+					: option.label || option.name
+			);
 
 			const options = suggestions.map( ( s ) => ( {
 				label: s,

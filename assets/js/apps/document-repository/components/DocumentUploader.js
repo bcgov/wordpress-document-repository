@@ -39,6 +39,7 @@ import {
 	Spinner,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
+import TaxonomyTokenField from '../../shared/components/TaxonomyTokenField';
 
 /**
  * State Management
@@ -450,6 +451,39 @@ const DocumentUploader = ( {
 				);
 
 			case 'taxonomy':
+				// Check if this is a multi-select taxonomy field
+				if ( field.multiple ) {
+					// Coerce value into an array for the multi-select field
+					let valueArray;
+					const raw = metadata[ id ];
+					if ( Array.isArray( raw ) ) {
+						valueArray = raw;
+					} else if ( raw ) {
+						valueArray = [ raw ];
+					} else {
+						valueArray = [];
+					}
+
+					return (
+						<TaxonomyTokenField
+							key={ id }
+							id={ id }
+							label={ fieldLabel }
+							value={ valueArray }
+							options={ options || [] }
+							onChange={ ( selectedValues ) =>
+								handleMetadataChange( id, selectedValues )
+							}
+							placeholder={ __(
+								'Type to search or select…',
+								'bcgov-design-system'
+							) }
+							required={ required }
+						/>
+					);
+				}
+
+				// Single select taxonomy
 				return (
 					<SelectControl
 						key={ id }
