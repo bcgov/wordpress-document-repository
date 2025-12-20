@@ -66,7 +66,7 @@ class DocumentPostType {
             'supports'            => [ 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'custom-fields', 'revisions' ],
             'hierarchical'        => false,
             'public'              => true,
-            'show_ui'             => true,
+            'show_ui'             => false,
             'show_in_menu'        => true,
             'menu_position'       => $this->config->get( 'menu_position' ),
             'menu_icon'           => $this->config->get( 'menu_icon' ),

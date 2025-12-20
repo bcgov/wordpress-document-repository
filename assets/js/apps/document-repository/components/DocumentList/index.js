@@ -4,7 +4,6 @@ import {
 	SelectControl,
 	TextControl,
 	TextareaControl,
-	FormTokenField,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import ErrorBoundary from './ErrorBoundary';
@@ -14,6 +13,7 @@ import MetadataModal from '../../../shared/components/MetadataModal';
 import UploadArea from './UploadArea';
 import PaginationControls from './PaginationControls';
 import RetryNotice from './RetryNotice';
+import TaxonomyTokenField from '../../../shared/components/TaxonomyTokenField';
 import { isAllView, isTrashView } from '../../utils/documentStatus';
 
 // Import custom hooks
@@ -737,28 +737,28 @@ const DocumentList = ( {
 												}
 
 												inputElement = (
-													<FormTokenField
+													<TaxonomyTokenField
 														id={ field.id }
+														label={ field.label }
 														value={ valueArray }
-														suggestions={ (
+														options={
 															field.options || []
-														).map( ( option ) =>
-															typeof option ===
-															'string'
-																? option
-																: option.label ||
-																  option.name
-														) }
-														onChange={ ( tokens ) =>
+														}
+														onChange={ (
+															selectedValues
+														) =>
 															updateEditedField(
 																field.id,
-																tokens
+																selectedValues
 															)
 														}
 														placeholder={ __(
-															'Add or select…',
+															'Type to search or select…',
 															'bcgov-design-system'
 														) }
+														required={
+															field.required
+														}
 													/>
 												);
 											} else {
