@@ -150,11 +150,27 @@ const useMetadataManagement = ( {
 			return false;
 		}
 
-		return metadataFields.some( ( field ) => {
-			const currentValue = editingMetadata.metadata?.[ field.id ] || '';
-			const editedValue = editedValues[ field.id ] || '';
-			return currentValue !== editedValue;
+		// Check metadata fields
+		const metadataChanged = metadataFields.some( ( field ) => {
+			const currentValue = editingMetadata.metadata?.[ field.id ] ?? '';
+			const editedValue = editedValues[ field.id ] ?? '';
+			// Use JSON stringify to compare arrays/objects reliably.
+			return (
+				JSON.stringify( currentValue ) !== JSON.stringify( editedValue )
+			);
 		} );
+
+		// Check title
+		const currentTitle = editingMetadata.title || '';
+		const editedTitle = editedValues.title || '';
+		const titleChanged = currentTitle !== editedTitle;
+
+		// Check excerpt
+		const currentExcerpt = editingMetadata.excerpt || '';
+		const editedExcerpt = editedValues.excerpt || '';
+		const excerptChanged = currentExcerpt !== editedExcerpt;
+
+		return metadataChanged || titleChanged || excerptChanged;
 	}, [ metadataState, metadataFields ] );
 
 	/**
@@ -177,12 +193,87 @@ const useMetadataManagement = ( {
 					document.metadata?.upload_date,
 			};
 
+			/**
+			 * Convert term name/label to ID for SelectControl compatibility
+			 * @param {string|number} termValue - The term value (name or ID)
+			 * @param {Array}         options   - Field options array
+			 * @return {string|number} - The term ID or original value if not found
+			 */
+			const convertTermNameToId = ( termValue, options ) => {
+				// If already an ID (numeric), return as is
+				if (
+					typeof termValue === 'number' ||
+					( typeof termValue === 'string' &&
+						/^\d+$/.test( termValue ) )
+				) {
+					return termValue;
+				}
+				// Find matching option by name/label
+				const option = options.find(
+					( opt ) =>
+						( typeof opt === 'string' && opt === termValue ) ||
+						( typeof opt === 'object' &&
+							( opt.name === termValue ||
+								opt.label === termValue ) )
+				);
+				// If no option found, return original value
+				if ( ! option ) {
+					return termValue;
+				}
+				// If option is an object, return value or id; otherwise return option itself
+				if ( typeof option === 'object' ) {
+					return option.value || option.id;
+				}
+				return option;
+			};
+
 			// Initialize edited values with current metadata, preserving case
+			// For taxonomy fields marked `multiple`, coerce stored values into
+			// an array so the UI (token fields / multi-select) always receives
+			// a consistent array shape. This avoids type surprises when
+			// comparing and saving values.
 			const initialValues = {};
 			metadataFields.forEach( ( field ) => {
-				initialValues[ field.id ] =
-					document.metadata?.[ field.id ] ?? '';
+				// If taxonomy and marked multiselect, coerce to array
+				if ( field.type === 'taxonomy' && field.multiple ) {
+					const val = document.metadata?.[ field.id ];
+					let coerced;
+					if ( Array.isArray( val ) ) {
+						coerced = val;
+					} else if ( val ) {
+						coerced = [ val ];
+					} else {
+						coerced = [];
+					}
+					// Convert term names to IDs for SelectControl compatibility
+					if ( field.options && field.options.length > 0 ) {
+						coerced = coerced.map( ( termValue ) =>
+							convertTermNameToId( termValue, field.options )
+						);
+					}
+					initialValues[ field.id ] = coerced;
+				} else if ( field.type === 'taxonomy' ) {
+					// Single select taxonomy - convert term name to ID
+					const val = document.metadata?.[ field.id ] ?? '';
+					if ( val && field.options && field.options.length > 0 ) {
+						initialValues[ field.id ] = convertTermNameToId(
+							val,
+							field.options
+						);
+					} else {
+						initialValues[ field.id ] = val;
+					}
+				} else {
+					initialValues[ field.id ] =
+						document.metadata?.[ field.id ] ?? '';
+				}
 			} );
+
+			// Add title to initial values
+			initialValues.title = document.title ?? '';
+
+			// Add excerpt to initial values
+			initialValues.excerpt = document.excerpt ?? '';
 
 			dispatch( {
 				type: 'SET_EDITING_DOCUMENT',
@@ -202,15 +293,26 @@ const useMetadataManagement = ( {
 	const handleMetadataChange = useCallback(
 		( documentId, fieldId, value ) => {
 			// Update bulk edited metadata
+			const prevDoc =
+				metadataState.bulkEditedMetadata[ documentId ] || {};
+			let newDoc;
+			if ( fieldId === 'excerpt' ) {
+				newDoc = {
+					...prevDoc,
+					excerpt: value,
+				};
+			} else {
+				newDoc = {
+					...prevDoc,
+					[ fieldId ]: value,
+				};
+			}
 			const newBulkMetadata = {
 				...metadataState.bulkEditedMetadata,
-				[ documentId ]: {
-					...metadataState.bulkEditedMetadata[ documentId ],
-					[ fieldId ]: value,
-				},
+				[ documentId ]: newDoc,
 			};
 
-			// Check if any metadata has changed
+			// Check if any metadata, excerpt, title, or multiple-selection has changed
 			const hasChanges = Object.entries( newBulkMetadata ).some(
 				( [ docId, editedMetadata ] ) => {
 					const currentDoc = localDocuments.find(
@@ -219,16 +321,28 @@ const useMetadataManagement = ( {
 					if ( ! currentDoc ) {
 						return false;
 					}
-
-					return Object.entries( editedMetadata ).some(
-						( [ currentFieldId, editedValue ] ) => {
-							const originalValue =
-								currentDoc.metadata?.[ currentFieldId ] || '';
-							const isChanged =
-								String( originalValue ) !==
-								String( editedValue );
-							return isChanged;
-						}
+					// Check title
+					const originalTitle = currentDoc.title || '';
+					const isTitleChanged =
+						String( originalTitle ) !==
+						String( editedMetadata.title || '' );
+					// Check metadata fields
+					const metadataChanged = metadataFields.some( ( field ) => {
+						const originalValue =
+							currentDoc.metadata?.[ field.id ] ?? '';
+						const editedValue = editedMetadata[ field.id ] ?? '';
+						return (
+							JSON.stringify( originalValue ) !==
+							JSON.stringify( editedValue )
+						);
+					} );
+					// Check excerpt
+					const originalExcerpt = currentDoc.excerpt || '';
+					const isExcerptChanged =
+						String( originalExcerpt ) !==
+						String( editedMetadata.excerpt || '' );
+					return (
+						isTitleChanged || metadataChanged || isExcerptChanged
 					);
 				}
 			);
@@ -242,24 +356,14 @@ const useMetadataManagement = ( {
 				hasChanges,
 			} );
 
-			// Always update local documents to reflect changes in the UI
-			setLocalDocuments( ( prev ) => {
-				const newDocs = prev.map( ( doc ) => {
-					if ( doc.id === documentId ) {
-						return {
-							...doc,
-							metadata: {
-								...doc.metadata,
-								[ fieldId ]: value,
-							},
-						};
-					}
-					return doc;
-				} );
-				return newDocs;
-			} );
+			// Do NOT update localDocuments here in spreadsheet mode
 		},
-		[ localDocuments, metadataState.bulkEditedMetadata, dispatch ]
+		[
+			localDocuments,
+			metadataState.bulkEditedMetadata,
+			dispatch,
+			metadataFields,
+		]
 	);
 
 	/**
@@ -290,39 +394,108 @@ const useMetadataManagement = ( {
 		dispatch( { type: 'SET_IS_SAVING', payload: true } );
 
 		try {
-			await apiFetch( {
-				path: `/${ apiNamespace }/documents/${ editingMetadata.id }/metadata`,
-				method: 'POST',
-				data: editedValues,
+			// Separate metadata, excerpt, and title for different endpoints
+			const metadataToUpdate = {};
+			const titleChanged =
+				String( editingMetadata.title || '' ) !==
+				String( editedValues.title || '' );
+			const excerptChanged =
+				String( editingMetadata.excerpt || '' ) !==
+				String( editedValues.excerpt || '' );
+
+			// Only include metadata fields (not excerpt or title)
+			metadataFields.forEach( ( field ) => {
+				const currentValue =
+					editingMetadata.metadata?.[ field.id ] ?? '';
+				const editedValue = editedValues[ field.id ] ?? '';
+				if (
+					JSON.stringify( currentValue ) !==
+					JSON.stringify( editedValue )
+				) {
+					metadataToUpdate[ field.id ] = editedValue;
+				}
 			} );
 
-			// Update local documents
-			setLocalDocuments( ( prev ) =>
-				prev.map( ( doc ) =>
-					doc.id === editingMetadata.id
-						? {
-								...doc,
-								metadata: { ...doc.metadata, ...editedValues },
-						  }
-						: doc
-				)
+			// Prepare API calls
+			const calls = [];
+			const putData = {};
+			let updatedDocument = null;
+
+			// Update title if it changed
+			if ( titleChanged ) {
+				putData.title = editedValues.title;
+			}
+
+			// Update excerpt if it changed
+			if ( excerptChanged ) {
+				putData.excerpt = editedValues.excerpt;
+			}
+
+			// Make PUT request if title or excerpt changed
+			if ( Object.keys( putData ).length > 0 ) {
+				calls.push(
+					apiFetch( {
+						path: `/${ apiNamespace }/documents/${ editingMetadata.id }`,
+						method: 'PUT',
+						data: putData,
+					} ).then( ( response ) => {
+						// Store the updated document response for later use
+						updatedDocument = response;
+						return response;
+					} )
+				);
+			}
+
+			// Update metadata if there are changes
+			if ( Object.keys( metadataToUpdate ).length > 0 ) {
+				calls.push(
+					apiFetch( {
+						path: `/${ apiNamespace }/documents/${ editingMetadata.id }/metadata`,
+						method: 'POST',
+						data: metadataToUpdate,
+					} ).then( ( response ) => {
+						// Store the updated document response for later use (metadata endpoint takes precedence)
+						updatedDocument = response;
+						return response;
+					} )
+				);
+			}
+
+			// Execute all API calls
+			await Promise.all( calls );
+
+			// Use the updated document from API response if available, otherwise fall back to local updates
+			const finalDocument = updatedDocument || {
+				id: editingMetadata.id,
+				title: titleChanged
+					? editedValues.title
+					: editingMetadata.title,
+				metadata: {
+					...editingMetadata.metadata,
+					...metadataToUpdate,
+				},
+				excerpt: excerptChanged
+					? editedValues.excerpt
+					: editingMetadata.excerpt,
+			};
+
+			// Update local documents with the response from the server
+			const updatedDocuments = localDocuments.map( ( doc ) =>
+				doc.id === editingMetadata.id
+					? {
+							...doc,
+							title: finalDocument.title ?? doc.title,
+							metadata: finalDocument.metadata ?? doc.metadata,
+							excerpt: finalDocument.excerpt ?? doc.excerpt,
+					  }
+					: doc
 			);
+
+			setLocalDocuments( updatedDocuments );
 
 			// Update parent component if needed
 			if ( typeof onUpdateDocuments === 'function' ) {
-				onUpdateDocuments(
-					localDocuments.map( ( doc ) =>
-						doc.id === editingMetadata.id
-							? {
-									...doc,
-									metadata: {
-										...doc.metadata,
-										...editedValues,
-									},
-							  }
-							: doc
-					)
-				);
+				onUpdateDocuments( updatedDocuments );
 			}
 
 			// Reset editing state
@@ -360,6 +533,7 @@ const useMetadataManagement = ( {
 		metadataState,
 		apiNamespace,
 		localDocuments,
+		metadataFields,
 		onUpdateDocuments,
 		onShowNotification,
 		onError,
@@ -378,6 +552,7 @@ const useMetadataManagement = ( {
 				localDocuments.forEach( ( doc ) => {
 					initialBulkMetadata[ doc.id ] = {
 						...( doc.metadata || {} ),
+						excerpt: doc.excerpt || '', // Include excerpt in initial state
 					};
 				} );
 
@@ -401,32 +576,123 @@ const useMetadataManagement = ( {
 		dispatch( { type: 'SET_IS_SAVING_BULK', payload: true } );
 
 		try {
-			const results = await Promise.allSettled(
-				Object.entries( bulkEditedMetadata ).map(
-					( [ docId, metadata ] ) =>
+			// Only send updates for documents with actual changes (title, metadata, or excerpt)
+			const docsToUpdate = Object.entries( bulkEditedMetadata ).filter(
+				( [ docId, edited ] ) => {
+					const original = localDocuments.find(
+						( doc ) => doc.id.toString() === docId
+					);
+					if ( ! original ) return false;
+					// Check title
+					const origTitle = original.title ?? '';
+					const editTitle = edited.title ?? '';
+					const titleChanged =
+						String( origTitle ) !== String( editTitle );
+					// Check metadata fields
+					const metadataChanged = metadataFields.some( ( field ) => {
+						const origVal = original.metadata?.[ field.id ] ?? '';
+						const editVal = edited[ field.id ] ?? '';
+						return (
+							JSON.stringify( origVal ) !==
+							JSON.stringify( editVal )
+						);
+					} );
+					// Check excerpt
+					const origExcerpt = original.excerpt ?? '';
+					const editExcerpt = edited.excerpt ?? '';
+					const excerptChanged =
+						String( origExcerpt ) !== String( editExcerpt );
+					return titleChanged || metadataChanged || excerptChanged;
+				}
+			);
+
+			const updatePromises = docsToUpdate.map( ( [ docId, edited ] ) => {
+				const original = localDocuments.find(
+					( doc ) => doc.id.toString() === docId
+				);
+
+				const metaDataToUpdate = {};
+				metadataFields.forEach( ( field ) => {
+					const origVal = original.metadata?.[ field.id ] ?? '';
+					const editVal = edited[ field.id ] ?? '';
+					if (
+						JSON.stringify( origVal ) !== JSON.stringify( editVal )
+					) {
+						metaDataToUpdate[ field.id ] = editVal;
+					}
+				} );
+
+				const titleChanged =
+					String( original.title ?? '' ) !==
+					String( edited.title ?? '' );
+				const excerptChanged =
+					String( original.excerpt ?? '' ) !==
+					String( edited.excerpt ?? '' );
+
+				// Prepare API calls with document ID tracking
+				const calls = [];
+				const putData = {};
+
+				if ( titleChanged ) {
+					putData.title = edited.title;
+				}
+				if ( excerptChanged ) {
+					putData.excerpt = edited.excerpt;
+				}
+
+				if ( Object.keys( putData ).length > 0 ) {
+					calls.push(
+						apiFetch( {
+							path: `/${ apiNamespace }/documents/${ docId }`,
+							method: 'PUT',
+							data: putData,
+						} ).then( ( result ) => ( {
+							type: 'document',
+							docId,
+							result,
+						} ) )
+					);
+				}
+
+				if ( Object.keys( metaDataToUpdate ).length > 0 ) {
+					calls.push(
 						apiFetch( {
 							path: `/${ apiNamespace }/documents/${ docId }/metadata`,
 							method: 'POST',
-							data: metadata,
-						} )
-				)
-			);
+							data: metaDataToUpdate,
+						} ).then( ( result ) => ( {
+							type: 'metadata',
+							docId,
+							result,
+						} ) )
+					);
+				}
 
-			// Process results
-			const docIds = Object.keys( bulkEditedMetadata );
+				// Run all needed calls for this document in parallel
+				return Promise.all( calls );
+			} );
+
+			const results = await Promise.allSettled( updatePromises.flat() );
+
+			// Process results with proper document tracking
 			const failed = results
-				.map( ( result, index ) => ( {
-					result,
-					docId: docIds[ index ],
-				} ) )
-				.filter( ( { result } ) => result.status === 'rejected' );
+				.filter( ( result ) => result.status === 'rejected' )
+				.map( ( result ) => ( {
+					result: result.reason,
+					docId: result.value?.docId || 'unknown',
+				} ) );
 
+			// Flatten the results since updatePromises.flat() creates nested arrays
 			const successful = results
-				.map( ( result, index ) => ( {
-					result,
-					docId: docIds[ index ],
-				} ) )
-				.filter( ( { result } ) => result.status === 'fulfilled' );
+				.filter( ( result ) => result.status === 'fulfilled' )
+				.flatMap( ( result ) => {
+					// Handle both single results and nested arrays
+					if ( Array.isArray( result.value ) ) {
+						return result.value;
+					}
+					return [ result.value ];
+				} )
+				.filter( ( result ) => result ); // Filter out any undefined results
 
 			if ( failed.length > 0 ) {
 				// Handle failed operations
@@ -459,15 +725,22 @@ const useMetadataManagement = ( {
 			// Update local documents with successful API responses (contains properly formatted data)
 			if ( successful.length > 0 ) {
 				const updatedDocuments = localDocuments.map( ( doc ) => {
-					const successfulUpdate = successful.find(
-						( { docId } ) => docId === doc.id.toString()
+					const successfulUpdates = successful.filter(
+						( update ) => update.docId === doc.id.toString()
 					);
-					if ( successfulUpdate ) {
+
+					if ( successfulUpdates.length > 0 ) {
+						// Find the most recent update (should be the same document data)
+						const latestUpdate =
+							successfulUpdates[ successfulUpdates.length - 1 ];
 						// Use the fresh data from API response which has properly formatted taxonomy values
-						return successfulUpdate.result.value;
+						return latestUpdate.result;
 					}
 					return doc;
 				} );
+
+				// Update local state first
+				setLocalDocuments( updatedDocuments );
 
 				// Update parent component with refreshed data
 				if ( typeof onUpdateDocuments === 'function' ) {
@@ -500,7 +773,15 @@ const useMetadataManagement = ( {
 		} finally {
 			dispatch( { type: 'SET_IS_SAVING_BULK', payload: false } );
 		}
-	}, [ metadataState, apiNamespace, onError, onShowNotification ] );
+	}, [
+		metadataState,
+		apiNamespace,
+		localDocuments,
+		metadataFields,
+		onUpdateDocuments,
+		onError,
+		onShowNotification,
+	] );
 
 	return {
 		// Single document editing

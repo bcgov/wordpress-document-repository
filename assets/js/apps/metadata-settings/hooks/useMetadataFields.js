@@ -22,6 +22,7 @@ const useMetadataFields = () => {
 					type: 'text',
 					options: [],
 					_rawOptionsText: '',
+					multiple: false,
 				},
 				errors: {
 					label: '',
@@ -221,8 +222,10 @@ const useMetadataFields = () => {
 			id: '',
 			label: '',
 			type: 'text',
+			description: '',
 			options: [],
 			_rawOptionsText: '',
+			multiple: false,
 		} ),
 		[]
 	);

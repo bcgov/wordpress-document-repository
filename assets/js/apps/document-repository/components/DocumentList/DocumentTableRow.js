@@ -2,9 +2,13 @@ import {
 	Button,
 	CheckboxControl,
 	TextControl,
+	TextareaControl,
 	SelectControl,
 } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
+import TaxonomyTokenField from '../../../shared/components/TaxonomyTokenField';
+import { isTrashView } from '../../utils/documentStatus';
+import { highlightSearchTerm } from '../../utils/searchUtils';
 
 /**
  * DocumentTableRow Component
@@ -12,18 +16,21 @@ import { __, sprintf } from '@wordpress/i18n';
  * A row component that displays a single document's information and actions.
  * Handles both display and editing of document metadata in spreadsheet mode.
  *
- * @param {Object}   props                    - Component props
- * @param {Object}   props.document           - The document object containing all document data
- * @param {boolean}  props.isSelected         - Whether this document is currently selected
- * @param {Function} props.onSelect           - Callback when the document's selection state changes
- * @param {Function} props.onDelete           - Callback when the document is deleted
- * @param {Function} props.onEdit             - Callback when the document is edited
- * @param {boolean}  props.isDeleting         - Flag indicating if a delete operation is in progress
- * @param {Array}    props.metadataFields     - Array of metadata field definitions
- * @param {boolean}  props.isSpreadsheetMode  - Flag indicating if table is in spreadsheet mode
- * @param {Object}   props.bulkEditedMetadata - Object containing bulk edited metadata values
- * @param {Function} props.onMetadataChange   - Callback when metadata is changed in spreadsheet mode
- * @param {Function} props.formatFileSize     - Function to format file size for display
+ * @param {Object}   props                      - Component props
+ * @param {Object}   props.document             - The document object containing all document data
+ * @param {boolean}  props.isSelected           - Whether this document is currently selected
+ * @param {Function} props.onSelect             - Callback when the document's selection state changes
+ * @param {Function} props.onDelete             - Callback when the document is deleted
+ * @param {Function} props.onRestore            - Callback when the document is restored from trash
+ * @param {Function} props.onEdit               - Callback when the document is edited
+ * @param {boolean}  props.isDeleting           - Flag indicating if a delete operation is in progress
+ * @param {Array}    props.metadataFields       - Array of metadata field definitions
+ * @param {boolean}  props.isSpreadsheetMode    - Flag indicating if table is in spreadsheet mode
+ * @param {Object}   props.bulkEditedMetadata   - Object containing bulk edited metadata values
+ * @param {Function} props.onMetadataChange     - Callback when metadata is changed in spreadsheet mode
+ * @param {Function} props.formatFileSize       - Function to format file size for display
+ * @param {string}   props.documentStatusFilter - Current status filter ('all', 'trash', etc.)
+ * @param {string}   props.searchTerm           - Current search term for highlighting
  * @return {JSX.Element} Rendered document table row
  */
 function DocumentTableRow( {
@@ -32,13 +39,64 @@ function DocumentTableRow( {
 	onSelect,
 	onDelete,
 	onEdit,
+	onRestore,
 	isDeleting,
 	metadataFields,
 	isSpreadsheetMode,
 	bulkEditedMetadata,
 	onMetadataChange,
 	formatFileSize,
+	documentStatusFilter,
+	searchTerm = '',
 } ) {
+	/**
+	 * Render excerpt cell content
+	 * @return {JSX.Element|string} Excerpt content
+	 */
+	const renderExcerpt = () => {
+		if ( isSpreadsheetMode ) {
+			return (
+				<TextareaControl
+					value={ ( () => {
+						const hasBulkEdit =
+							typeof bulkEditedMetadata?.[ document.id ]
+								?.excerpt !== 'undefined';
+						if ( hasBulkEdit ) {
+							return bulkEditedMetadata?.[ document.id ]?.excerpt;
+						}
+						return document.excerpt || '';
+					} )() }
+					onChange={ ( newValue ) => {
+						onMetadataChange( document.id, 'excerpt', newValue );
+						// Auto-resize the textarea
+						setTimeout( () => {
+							const textarea = window.document.querySelector(
+								`[data-document-id="${ document.id }"] textarea`
+							);
+							if ( textarea ) {
+								textarea.style.height = 'auto';
+								textarea.style.height =
+									textarea.scrollHeight + 'px';
+							}
+						}, 0 );
+					} }
+					placeholder={ __(
+						'Enter excerpt…',
+						'bcgov-design-system'
+					) }
+					rows={ 2 }
+					className="excerpt-textarea"
+				/>
+			);
+		}
+
+		if ( document.excerpt ) {
+			return highlightSearchTerm( document.excerpt, searchTerm );
+		}
+
+		return '—';
+	};
+
 	const renderMetadataField = ( field ) => {
 		if ( ! isSpreadsheetMode ) {
 			const fieldValue =
@@ -53,29 +111,60 @@ function DocumentTableRow( {
 					? fieldValue
 					: [ fieldValue ];
 				// Return single value or comma-separated for multiple
-				return values.length === 1 ? values[ 0 ] : values.join( ', ' );
+				const displayValue =
+					values.length === 1 ? values[ 0 ] : values.join( ', ' );
+				return highlightSearchTerm( displayValue, searchTerm );
 			}
 
-			return fieldValue || '—';
+			return fieldValue
+				? highlightSearchTerm( fieldValue, searchTerm )
+				: '—';
 		}
 
 		const fieldValue =
-			bulkEditedMetadata[ document.id ]?.[ field.id ] || '';
+			bulkEditedMetadata?.[ document.id ]?.[ field.id ] || '';
 
 		if ( field.type === 'taxonomy' ) {
-			const options = ( field.options || [] ).map( ( option ) => {
-				// Handle both old format (string) and new format (object with id/name)
-				if ( typeof option === 'string' ) {
-					return {
-						label: option,
-						value: option,
-					};
+			if ( field.multiple ) {
+				let valueArray;
+				if ( Array.isArray( fieldValue ) ) {
+					valueArray = fieldValue;
+				} else if ( fieldValue ) {
+					valueArray = [ fieldValue ];
+				} else {
+					valueArray = [];
 				}
-				return {
-					label: option.label || option.name,
-					value: option.label || option.name,
-				};
-			} );
+				return (
+					<TaxonomyTokenField
+						id={ `${ document.id }-${ field.id }` }
+						value={ valueArray }
+						options={ field.options || [] }
+						onChange={ ( selectedValues ) =>
+							onMetadataChange(
+								document.id,
+								field.id,
+								selectedValues
+							)
+						}
+						placeholder={ __(
+							'Type to search or select…',
+							'bcgov-design-system'
+						) }
+					/>
+				);
+			}
+
+			const suggestions = ( field.options || [] ).map( ( option ) =>
+				// Handle both old format (string) and new format (object with id/name)
+				typeof option === 'string'
+					? option
+					: option.label || option.name
+			);
+
+			const options = suggestions.map( ( s ) => ( {
+				label: s,
+				value: s,
+			} ) );
 
 			return (
 				<SelectControl
@@ -106,8 +195,127 @@ function DocumentTableRow( {
 		);
 	};
 
+	/**
+	 * Render the action buttons contextually.
+	 * If viewing trashed documents, show the restore and delete permanently buttons
+	 * If viewing other documents, show the download, edit and trash buttons
+	 */
+	const renderActions = () => {
+		if ( isTrashView( documentStatusFilter ) ) {
+			return (
+				<>
+					{ /* Restore button */ }
+					<Button
+						onClick={ () => onRestore( document ) }
+						className="doc-repo-button icon-button table-action-button"
+						title={ __( 'Restore', 'bcgov-design-system' ) }
+						aria-label={ __( 'Restore', 'bcgov-design-system' ) }
+						disabled={ isDeleting }
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 -960 960 960"
+							width="16px"
+							height="16px"
+						>
+							<path
+								d="M440-320h80v-166l64 62 56-56-160-160-160 160 56 56 64-62v166ZM280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
+								fill="currentColor"
+							/>
+						</svg>
+					</Button>
+
+					{ /* Delete Permanently button */ }
+					<Button
+						onClick={ () => onDelete( document ) }
+						className="doc-repo-button icon-button table-action-button"
+						title={ __(
+							'Delete Permanently',
+							'bcgov-design-system'
+						) }
+						aria-label={ __(
+							'Delete Permanently',
+							'bcgov-design-system'
+						) }
+						disabled={ isDeleting }
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 -960 960 960"
+							width="16px"
+							height="16px"
+						>
+							<path
+								d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Z"
+								fill="currentColor"
+							/>
+						</svg>
+					</Button>
+				</>
+			);
+		}
+		return (
+			<>
+				{ /* Download button */ }
+				<Button
+					onClick={ () =>
+						window.open(
+							document.metadata.document_file_url,
+							'_blank'
+						)
+					}
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Download', 'bcgov-design-system' ) }
+					aria-label={ __( 'Download', 'bcgov-design-system' ) }
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path
+							d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+							fill="currentColor"
+						/>
+					</svg>
+				</Button>
+
+				{ /* Edit button */ }
+				<Button
+					onClick={ () => onEdit( document ) }
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Edit Metadata', 'bcgov-design-system' ) }
+					aria-label={ __( 'Edit Metadata', 'bcgov-design-system' ) }
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path
+							d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+							fill="currentColor"
+						/>
+					</svg>
+				</Button>
+
+				{ /* Trash button */ }
+				<Button
+					onClick={ () => onDelete( document ) }
+					className="doc-repo-button icon-button table-action-button"
+					title={ __( 'Trash', 'bcgov-design-system' ) }
+					aria-label={ __( 'Trash', 'bcgov-design-system' ) }
+					disabled={ isDeleting }
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path
+							d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+							fill="currentColor"
+						/>
+					</svg>
+				</Button>
+			</>
+		);
+	};
+
 	return (
-		<div className="document-table-row" role="row">
+		<div
+			className="document-table-row"
+			role="row"
+			data-document-id={ document.id }
+		>
 			{ /* Selection checkbox cell */ }
 			<div
 				className="document-table-cell"
@@ -122,7 +330,38 @@ function DocumentTableRow( {
 
 			{ /* Document title cell */ }
 			<div className="document-table-cell" role="cell">
-				{ document.title || document.filename }
+				{ isSpreadsheetMode ? (
+					<TextControl
+						value={ ( () => {
+							const hasBulkTitle =
+								typeof bulkEditedMetadata?.[ document.id ]
+									?.title !== 'undefined';
+							if ( hasBulkTitle ) {
+								return bulkEditedMetadata?.[ document.id ]
+									?.title;
+							}
+							return document.title || '';
+						} )() }
+						onChange={ ( newValue ) => {
+							onMetadataChange( document.id, 'title', newValue );
+						} }
+						placeholder={ __(
+							'Enter title…',
+							'bcgov-design-system'
+						) }
+						className="title-input"
+					/>
+				) : (
+					highlightSearchTerm(
+						document.title || document.filename,
+						searchTerm
+					)
+				) }
+			</div>
+
+			{ /* Excerpt cell */ }
+			<div className="document-table-cell excerpt-cell" role="cell">
+				{ renderExcerpt() }
 			</div>
 
 			{ /* Metadata cells - dynamically rendered based on metadata fields */ }
@@ -155,6 +394,41 @@ function DocumentTableRow( {
 					: '—' }
 			</div>
 
+			{ /* Revisions cell - clickable badge showing revision count */ }
+			<div className="document-table-cell revisions-cell" role="cell">
+				{ document.revisions && document.revisions.count > 0 ? (
+					<button
+						onClick={ () => {
+							if ( document.revisions.latest_link ) {
+								window.open(
+									document.revisions.latest_link,
+									'_blank'
+								);
+							}
+						} }
+						className="revisions-badge"
+						title={ sprintf(
+							/* translators: %d: number of revisions */
+							__( 'View %d revision(s)', 'bcgov-design-system' ),
+							document.revisions.count
+						) }
+						aria-label={ sprintf(
+							/* translators: %d: number of revisions */
+							__( 'View %d revision(s)', 'bcgov-design-system' ),
+							document.revisions.count
+						) }
+					>
+						{ sprintf(
+							/* translators: %d: number of revisions */
+							__( '%d revision(s)', 'bcgov-design-system' ),
+							document.revisions.count
+						) }
+					</button>
+				) : (
+					'—'
+				) }
+			</div>
+
 			{ /* Actions cell - only shown in regular mode */ }
 			<div
 				className="document-table-cell actions"
@@ -162,67 +436,7 @@ function DocumentTableRow( {
 				aria-label={ __( 'Document actions', 'bcgov-design-system' ) }
 			>
 				{ ! isSpreadsheetMode && (
-					<div className="action-buttons">
-						{ /* Download button */ }
-						<Button
-							onClick={ () =>
-								window.open(
-									document.metadata.document_file_url,
-									'_blank'
-								)
-							}
-							className="doc-repo-button icon-button table-action-button"
-							title={ __( 'Download', 'bcgov-design-system' ) }
-							aria-label={ __(
-								'Download',
-								'bcgov-design-system'
-							) }
-						>
-							<svg viewBox="0 0 24 24" width="16" height="16">
-								<path
-									d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
-									fill="currentColor"
-								/>
-							</svg>
-						</Button>
-
-						{ /* Edit button */ }
-						<Button
-							onClick={ () => onEdit( document ) }
-							className="doc-repo-button icon-button table-action-button"
-							title={ __(
-								'Edit Metadata',
-								'bcgov-design-system'
-							) }
-							aria-label={ __(
-								'Edit Metadata',
-								'bcgov-design-system'
-							) }
-						>
-							<svg viewBox="0 0 24 24" width="16" height="16">
-								<path
-									d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-									fill="currentColor"
-								/>
-							</svg>
-						</Button>
-
-						{ /* Delete button */ }
-						<Button
-							onClick={ () => onDelete( document ) }
-							className="doc-repo-button icon-button table-action-button"
-							title={ __( 'Delete', 'bcgov-design-system' ) }
-							aria-label={ __( 'Delete', 'bcgov-design-system' ) }
-							disabled={ isDeleting }
-						>
-							<svg viewBox="0 0 24 24" width="16" height="16">
-								<path
-									d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-									fill="currentColor"
-								/>
-							</svg>
-						</Button>
-					</div>
+					<div className="action-buttons">{ renderActions() }</div>
 				) }
 			</div>
 		</div>

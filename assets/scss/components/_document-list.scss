@@ -55,6 +55,7 @@
 			align-items: center;
 			gap: $spacing-lg;
 			margin-bottom: $spacing-md;
+			flex-wrap: wrap;
 
 			.doc-repo-button {
 				min-height: 36px;

@@ -18,15 +18,15 @@
    Base Element Styles - Least Specific
    ========================================= */
 
-// Basic SVG icon styles - less specific SVG selectors first
-svg {
+// Basic SVG icon styles - scoped to document repository
+.document-repository svg {
 	width: 1.25rem;
 	height: 1.25rem;
 	transition: all 0.2s ease;
 }
 
-// Basic paragraph styles
-p {
+// Basic paragraph styles - scoped to document repository
+.document-repository p {
 	line-height: 1.5;
 	margin: 0 0 1rem;
 }
@@ -35,8 +35,8 @@ p {
    General Components - Medium Specificity
    ========================================= */
 
-// Table styles
-table {
+// Table styles - scoped to document repository
+.document-repository table {
 	width: 100%;
 	border-collapse: collapse;
 
@@ -295,18 +295,100 @@ table {
 	// Pagination
 	.pagination {
 		display: flex;
-		justify-content: center;
+		justify-content: flex-end;
 		align-items: center;
-		gap: $spacing-md;
-		margin: $spacing-lg 0;
+		gap: 0.25rem; // Small gap between elements
+		margin-top: $spacing-md;
+		flex-wrap: wrap; // Allow wrapping on small screens
+		position: relative;
 
-		.page-info {
-			font-size: $font-size-sm;
-			color: $color-text-light;
+		// Loading spinner
+		.pagination-loading {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			margin-right: 0.5rem;
+
+			.components-spinner {
+				margin: 0;
+				width: 1rem;
+				height: 1rem;
+			}
 		}
 
 		.components-button {
-			min-width: 5rem;
+			min-width: 2rem;
+			width: 2rem;
+			height: 2rem;
+			padding: 0;
+			text-align: center;
+			font-size: 0.875rem;
+			border-radius: 0.25rem;
+			margin: 0;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border: 1px solid $color-border;
+			background: $color-white;
+			color: $color-text;
+
+			&:hover:not(:disabled) {
+				background: $color-bg-lighter;
+				border-color: $color-primary;
+			}
+
+			&:disabled {
+				background: $color-bg-lighter;
+				border-color: $color-border;
+				color: $color-text-light;
+				opacity: 0.6;
+				cursor: not-allowed;
+			}
+
+			// Navigation buttons (First, Prev, Next, Last)
+			&.pagination-button-first,
+			&.pagination-button-prev,
+			&.pagination-button-next,
+			&.pagination-button-last {
+				font-size: 1rem;
+				font-weight: 600;
+			}
+
+			// Page number buttons
+			&.pagination-button-number {
+				&:hover:not(:disabled) {
+					border-color: $color-primary;
+				}
+			}
+
+			// Current page
+			&.current-page {
+				background: $color-primary !important;
+				color: $color-white !important;
+				border-color: $color-primary !important;
+				font-weight: 600 !important;
+
+				&:hover {
+					background: $color-primary-dark !important;
+					border-color: $color-primary-dark !important;
+				}
+
+				&:disabled {
+					background: $color-primary !important;
+					color: $color-white !important;
+					border-color: $color-primary !important;
+					opacity: 1 !important;
+					cursor: default !important;
+				}
+			}
+		}
+
+		// Page indicator text ("X of Y")
+		.pagination-page-indicator {
+			margin: 0 0.5rem;
+			font-size: 0.875rem;
+			color: $color-text;
+			white-space: nowrap;
 		}
 	}
 }
@@ -377,6 +459,10 @@ table {
 		vertical-align: middle;
 		overflow: visible;
 		text-overflow: clip;
+
+		&.document-table__search-cell {
+			overflow: visible;
+		}
 		white-space: normal;
 
 		&.header {
@@ -427,6 +513,15 @@ table {
 		text-overflow: clip;
 	}
 
+	// Excerpt cell specifically
+	.excerpt-cell {
+		min-width: 15rem;
+		max-width: none;
+		white-space: normal;
+		overflow: visible;
+		text-overflow: clip;
+	}
+
 	// Actions cell specifically
 	.document-table-cell:last-child {
 		width: 6rem;
@@ -438,9 +533,76 @@ table {
 		}
 	}
 
+	// Revisions cell with badge styling
+	.revisions-cell {
+		width: 5rem;
+		min-width: 5rem;
+		text-align: center;
+	}
+
+	// Revisions badge button styling
+	.revisions-badge {
+		display: inline-block;
+		padding: 0.375rem 0.75rem;
+		background-color: #f0f6fc;
+		border: 0.0625rem solid #d0d7de;
+		border-radius: 0.25rem;
+		color: #0969da;
+		font-size: $font-size-sm;
+		font-weight: $font-weight-bold;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		white-space: nowrap;
+
+		&:hover {
+			background-color: #e8f0ff;
+			border-color: #0969da;
+			color: #0860ca;
+			text-decoration: none;
+		}
+
+		&:focus {
+			outline: 0.125rem solid #0969da;
+			outline-offset: 0.125rem;
+		}
+	}
+
 	// Metadata column specifically
 	.metadata-column {
 		min-width: 10rem;
 		max-width: 15rem;
+	}
+}
+
+// Search input and button styles
+.document-search-wrapper {
+	display: flex;
+	align-items: center;
+	gap: $spacing-sm;
+
+	.document-search-input-wrapper {
+		display: flex;
+		align-items: center;
+		gap: $spacing-xs;
+		flex: 1;
+		max-width: 20rem;
+
+		.document-search-input {
+			flex: 1;
+		}
+
+		.document-search-button {
+			flex-shrink: 0;
+		}
+
+		.document-search-clear {
+			flex-shrink: 0;
+			margin-left: $spacing-xs;
+
+			svg {
+				width: 1rem;
+				height: 1rem;
+			}
+		}
 	}
 }

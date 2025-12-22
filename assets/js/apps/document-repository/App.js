@@ -16,6 +16,7 @@ import DocumentList from './components/DocumentList';
 import DocumentUploader from './components/DocumentUploader';
 import { useDocuments } from './hooks/useDocuments';
 import AppErrorBoundary from '../../shared/components/AppErrorBoundary';
+import { isAllView } from './utils/documentStatus';
 
 /**
  * Main App component
@@ -41,22 +42,31 @@ const App = () => {
 	const [ selectedFileForUpload, setSelectedFileForUpload ] =
 		useState( null );
 
+	// Document filtering and selection state
+	const [ documentStatusFilter, setDocumentStatusFilter ] = useState( 'all' );
+	const [ selectedDocuments, setSelectedDocuments ] = useState( [] );
+
 	// Document data and operations from custom hook
 	const {
 		documents,
 		totalDocuments,
 		currentPage,
 		totalPages,
+		statusCounts,
 		fetchDocuments,
 		deleteDocument,
+		trashDocument,
+		restoreDocument,
 		isDeleting,
 		isLoading: isLoadingDocuments,
 		error: documentsError,
 		setSearchParams,
+		searchTerm,
+		searchInput,
+		setSearchInput,
+		performSearch,
+		handleSearchKeyPress,
 	} = useDocuments();
-
-	// Selected documents for bulk actions
-	const [ selectedDocuments, setSelectedDocuments ] = useState( [] );
 
 	// Initialize data on component mount
 	useEffect( () => {
@@ -152,6 +162,23 @@ const App = () => {
 	}, [ fetchDocuments ] );
 
 	/**
+	 * When switching between document views (all vs trash):
+	 * - Update the query params for API filtering
+	 * - Reset selected documents to avoid carrying over from previous view
+	 */
+	useEffect( () => {
+		setSearchParams( ( prev ) => ( {
+			...prev,
+			status: isAllView( documentStatusFilter )
+				? undefined
+				: documentStatusFilter,
+			page: 1,
+		} ) );
+
+		setSelectedDocuments( [] );
+	}, [ documentStatusFilter, setSearchParams ] );
+
+	/**
 	 * Handle document selection for bulk actions
 	 *
 	 * @function handleDocumentSelection
@@ -237,9 +264,14 @@ const App = () => {
 	 */
 	const debouncedFetchDocuments = useMemo( () => {
 		let timer;
-		return ( ...args ) => {
+		return () => {
 			clearTimeout( timer );
-			timer = setTimeout( () => fetchDocuments( ...args ), 1000 );
+			timer = setTimeout( () => {
+				// Refresh documents after upload to include new documents
+				if ( fetchDocuments ) {
+					fetchDocuments();
+				}
+			}, 1000 );
 		};
 	}, [ fetchDocuments ] );
 
@@ -422,6 +454,8 @@ const App = () => {
 					totalPages={ totalPages || 1 }
 					onPageChange={ handlePageChange }
 					onDelete={ deleteDocument }
+					onTrash={ trashDocument }
+					onRestore={ restoreDocument }
 					isDeleting={ isDeleting }
 					selectedDocuments={ selectedDocuments || [] }
 					onSelectDocument={ handleDocumentSelection }
@@ -429,6 +463,15 @@ const App = () => {
 					metadataFields={ metadataFields || [] }
 					onUploadSuccess={ handleUploadSuccess }
 					onFileDrop={ handleFileDrop }
+					statusCounts={ statusCounts }
+					documentStatusFilter={ documentStatusFilter }
+					onStatusFilterChange={ setDocumentStatusFilter }
+					searchTerm={ searchTerm }
+					searchInput={ searchInput }
+					setSearchInput={ setSearchInput }
+					performSearch={ performSearch }
+					handleSearchKeyPress={ handleSearchKeyPress }
+					setSearchParams={ setSearchParams }
 				/>
 
 				{ /* Upload Modal */ }

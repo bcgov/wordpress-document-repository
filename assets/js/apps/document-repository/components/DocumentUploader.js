@@ -38,7 +38,8 @@ import {
 	CardFooter,
 	Spinner,
 } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
+import TaxonomyTokenField from '../../shared/components/TaxonomyTokenField';
 
 /**
  * State Management
@@ -149,8 +150,26 @@ const DocumentUploader = ( {
 
 	// Handle file validation and selection
 	const validateAndSetFile = useCallback(
-		( fileToValidate ) => {
+		async ( fileToValidate ) => {
 			if ( ! fileToValidate ) {
+				return false;
+			}
+
+			// Check for a duplicate filename.
+			const filenameWithoutExt = fileToValidate.name;
+			const isDuplicate = await checkDuplicate( filenameWithoutExt );
+
+			if ( isDuplicate ) {
+				setError(
+					sprintf(
+						/* translators: %s: document filename */
+						__(
+							'A document named "%s" already exists. If you want to update this file, please use the document versioning system instead of uploading a new file with the same name.',
+							'wordpress-document-repository'
+						),
+						filenameWithoutExt
+					)
+				);
 				return false;
 			}
 
@@ -173,6 +192,50 @@ const DocumentUploader = ( {
 		},
 		[ validateFile ]
 	);
+
+	/**
+	 * Check whether a given filename already exists in the document repository.
+	 *
+	 * Sends a GET request to the WordPress REST API endpoint to verify
+	 * if a document with the same filename exists.
+	 *
+	 * @async
+	 * @param {string} filename - The name of the file to check.
+	 * @return {Promise<boolean>} Resolves to true if a duplicate exists,
+	 *                             false otherwise or if the request fails.
+	 */
+	const checkDuplicate = async ( filename ) => {
+		try {
+			const response = await fetch(
+				`${ window.documentRepositorySettings.apiRoot }${
+					window.documentRepositorySettings.apiNamespace
+				}/documents/check-duplicate?filename=${ encodeURIComponent(
+					filename
+				) }`,
+				{
+					headers: {
+						'X-WP-Nonce': window.documentRepositorySettings.nonce,
+					},
+				}
+			);
+
+			if ( ! response.ok ) {
+				throw new Error( 'Failed to check for duplicates' );
+			}
+
+			const data = await response.json();
+			return data.duplicate;
+		} catch ( err ) {
+			setError(
+				err.message ||
+					__(
+						'Failed to check if a duplicate file exists',
+						'wordpress-document-repository'
+					)
+			);
+			return false;
+		}
+	};
 
 	// Handle initial file setting from props
 	useEffect( () => {
@@ -388,6 +451,39 @@ const DocumentUploader = ( {
 				);
 
 			case 'taxonomy':
+				// Check if this is a multi-select taxonomy field
+				if ( field.multiple ) {
+					// Coerce value into an array for the multi-select field
+					let valueArray;
+					const raw = metadata[ id ];
+					if ( Array.isArray( raw ) ) {
+						valueArray = raw;
+					} else if ( raw ) {
+						valueArray = [ raw ];
+					} else {
+						valueArray = [];
+					}
+
+					return (
+						<TaxonomyTokenField
+							key={ id }
+							id={ id }
+							label={ fieldLabel }
+							value={ valueArray }
+							options={ options || [] }
+							onChange={ ( selectedValues ) =>
+								handleMetadataChange( id, selectedValues )
+							}
+							placeholder={ __(
+								'Type to search or select…',
+								'bcgov-design-system'
+							) }
+							required={ required }
+						/>
+					);
+				}
+
+				// Single select taxonomy
 				return (
 					<SelectControl
 						key={ id }

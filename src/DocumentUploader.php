@@ -172,18 +172,6 @@ class DocumentUploader {
             );
         }
 
-        // Check for duplicate title if provided in metadata.
-        if ( ! empty( $metadata['title'] ) ) {
-            $duplicate = $this->check_for_duplicate( $metadata['title'] );
-            if ( $duplicate ) {
-                return new WP_Error(
-                    'duplicate_document',
-                    'A document with this title already exists.',
-                    [ 'duplicate_id' => $duplicate->ID ]
-                );
-            }
-        }
-
         // Set default title if not provided.
         if ( empty( $metadata['title'] ) ) {
             $metadata['title'] = pathinfo( $file['name'], PATHINFO_FILENAME );
@@ -227,6 +215,38 @@ class DocumentUploader {
                 'Failed to create attachment: ' . $attachment_id->get_error_message(),
                 [ 'original_error' => $attachment_id->get_error_data() ]
             );
+        }
+
+        // Check for a duplicate attachment name.
+        $existing_attachment = null;
+        if ( ! empty( $metadata['title'] ) ) {
+            $existing_attachment = $this->check_for_duplicate( $metadata['title'] );
+        }
+
+        // If there is already an attachment by that name, use versioning.
+        if ( $existing_attachment ) {
+            $doc_id = $existing_attachment->ID;
+
+            // Preserve the old file in versioning.
+            $old_file_id = get_post_meta( $doc_id, 'document_file_id', true );
+            if ( $old_file_id ) {
+                $versions   = get_post_meta( $doc_id, 'document_file_versions', true );
+                $versions   = is_array( $versions ) ? $versions : [];
+                $versions[] = $old_file_id;
+                update_post_meta( $doc_id, 'document_file_versions', $versions );
+            }
+
+            // Update the current file.
+            update_post_meta( $doc_id, 'document_file_id', $attachment_id );
+
+            // Store reference to document post in attachment meta.
+            update_post_meta( $attachment_id, '_document_repository_post_id', $doc_id );
+
+            // Hook for version upload.
+            do_action( 'bcgov_document_repository_document_version_uploaded', $doc_id, $attachment_id, $old_file_id );
+
+            // Get full document data.
+            return $this->get_document_data( $doc_id );
         }
 
         // Create document post.
@@ -276,6 +296,13 @@ class DocumentUploader {
 
         // Save attachment ID as post meta.
         update_post_meta( $post_id, 'document_file_id', $attachment_id );
+
+        // Save version history.
+        $versions = get_post_meta( $post_id, 'document_file_versions', true );
+        $versions = is_array( $versions ) ? $versions : [];
+
+        $versions[] = $attachment_id;
+        update_post_meta( $post_id, 'document_file_versions', $versions );
 
         // Get metadata manager to check field types.
         $metadata_manager = new DocumentMetadataManager( $this->config );
@@ -347,13 +374,33 @@ class DocumentUploader {
         // Get metadata manager.
         $metadata_manager = new DocumentMetadataManager( $this->config );
 
-        // Return document data.
+        // Get revisions for this post to expose to the REST response.
+        $revisions            = wp_get_post_revisions( $post->ID );
+        $revision_count       = is_array( $revisions ) ? count( $revisions ) : 0;
+        $latest_revision_id   = null;
+        $latest_revision_link = '';
+        if ( $revision_count > 0 ) {
+            // wp_get_post_revisions returns an array keyed by revision ID with newest first in recent WP versions,
+            // but to be explicit, use array_keys and pick the first value.
+            $rev_keys             = array_keys( $revisions );
+            $latest_revision_id   = (int) reset( $rev_keys );
+            $latest_revision_link = admin_url( 'revision.php?revision=' . $latest_revision_id );
+        }
+
+        // Return document data including revision info so the UI can render a link to the diff viewer.
         return [
-            'id'       => $post->ID,
-            'title'    => $post->post_title,
-            'date'     => $post->post_date,
-            'author'   => get_the_author_meta( 'display_name', $post->post_author ),
-            'metadata' => $metadata_manager->get_document_metadata( $post->ID ),
+            'id'        => $post->ID,
+            'title'     => $post->post_title,
+            'slug'      => $post->post_name,
+            'date'      => $post->post_date,
+            'author'    => get_the_author_meta( 'display_name', $post->post_author ),
+            'excerpt'   => $post->post_excerpt,
+            'metadata'  => $metadata_manager->get_document_metadata( $post->ID ),
+            'revisions' => [
+                'count'       => $revision_count,
+                'latest'      => $latest_revision_id,
+                'latest_link' => $latest_revision_link,
+            ],
         ];
     }
 
@@ -364,7 +411,26 @@ class DocumentUploader {
      * @return \WP_Post|null Duplicate post or null if none found.
      */
     private function check_for_duplicate( string $title ) {
-        $query = new \WP_Query(
+        // First try to find a post by the sanitized slug (post_name). This
+        // ensures that if the title was changed but the slug was preserved,
+        // we still recognise the existing document and create a new version
+        // rather than a new document post.
+        $slug_query = new \WP_Query(
+            [
+                'post_type'      => $this->config->get_post_type(),
+                'post_status'    => 'publish',
+                'name'           => sanitize_title( $title ),
+                'posts_per_page' => 1,
+                'fields'         => 'ids',
+            ]
+        );
+
+        if ( $slug_query->have_posts() ) {
+            return get_post( $slug_query->posts[0] );
+        }
+
+        // Fallback: check by title (legacy behaviour).
+        $title_query = new \WP_Query(
             [
                 'post_type'      => $this->config->get_post_type(),
                 'post_status'    => 'publish',
@@ -374,8 +440,8 @@ class DocumentUploader {
             ]
         );
 
-        if ( $query->have_posts() ) {
-            return get_post( $query->posts[0] );
+        if ( $title_query->have_posts() ) {
+            return get_post( $title_query->posts[0] );
         }
 
         return null;
@@ -421,6 +487,39 @@ class DocumentUploader {
         // Delete attachment if it exists.
         if ( $attachment_id ) {
             wp_delete_attachment( $attachment_id, true );
+        }
+
+        return true;
+    }
+
+    /**
+     * Trash a document.
+     *
+     * @param int $document_id Document post ID.
+     * @return bool Whether the trashing was successful.
+     */
+    public function trash_document( int $document_id ): bool {
+        // Trash document post.
+        $result = wp_trash_post( $document_id );
+
+        if ( ! $result ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Restore a trashed document.
+     *
+     * @param int $id The document ID.
+     * @return bool True on success, false on failure.
+     */
+    public function restore_document( int $id ): bool {
+        $result = wp_untrash_post( $id );
+
+        if ( ! $result ) {
+            return false;
         }
 
         return true;

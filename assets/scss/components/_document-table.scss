@@ -2,112 +2,92 @@
 @use "../abstracts/mixins" as mix;
 @use "sass:color";
 
+/* Search highlight */
+.search-highlight {
+	background-color: #ffeb3b;
+	padding: 0.125rem 0;
+	border-radius: 2px;
+	font-weight: 500;
+	color: #000;
+	display: inline;
+}
+
+/* Style all doc-repo-button elements for consistent hover states */
+.doc-repo-button {
+
+	&:hover,
+	&:focus {
+		opacity: 0.9;
+	}
+
+	&.edit-button:hover,
+	&.edit-button:focus {
+		background-color: rgba($color-primary, 0.1);
+		color: $color-primary-dark;
+		border-color: $color-primary;
+	}
+
+	&.delete-button:hover,
+	&.delete-button:focus {
+		background-color: rgba($color-error, 0.9);
+		color: $color-white;
+	}
+
+	&.save-button {
+
+		&:hover,
+		&:focus {
+			background-color: #069; /* Slightly darker than primary */
+			color: $color-white;
+		}
+	}
+}
+
+/* Excerpt textarea in table cells */
+.document-table-cell {
+
+	.excerpt-textarea {
+		min-height: 3.75rem;
+		max-height: none; /* Remove max-height constraint */
+		resize: vertical;
+		transition: height 0.2s ease;
+		font-size: $font-size-sm;
+		line-height: 1.4;
+
+		&:focus {
+			min-height: 5rem;
+		}
+
+		// Auto-resize functionality
+		&.components-textarea-control__input {
+			overflow: visible; /* Allow overflow */
+			word-wrap: break-word;
+			border: 1px solid $color-gray-300;
+			border-radius: $border-radius-sm;
+			padding: $spacing-xs $spacing-sm;
+
+			&:focus {
+				border-color: $color-primary;
+				box-shadow: 0 0 0 1px $color-primary;
+			}
+		}
+	}
+}
+
+.document-table-wrapper {
+	position: relative;
+	width: 100%;
+}
+
 .document-table {
 	width: 100%;
 	border-collapse: collapse;
 	margin-bottom: $spacing-lg;
 	background-color: $color-bg-lightest;
+	overflow: visible; /* Allow textarea overflow */
+	position: relative;
 
-	&__header {
-		background-color: $color-gray-100;
-		border-bottom: 2px solid $color-gray-200;
-
-		th {
-			padding: $spacing-sm $spacing-md;
-			text-align: left;
-			font-weight: $font-weight-bold;
-			color: $color-gray-700;
-			white-space: nowrap;
-			user-select: none;
-
-			&.checkbox-column {
-				width: 40px;
-				text-align: center;
-			}
-
-			&.actions-column {
-				width: 120px;
-				text-align: center;
-			}
-		}
-	}
-
-	&__row {
-		display: flex;
-		align-items: center;
-		border-bottom: 1px solid $color-gray-200;
-		transition: background-color $transition-fast;
-
-		&:hover {
-			background-color: $color-gray-50;
-		}
-
-		&--selected {
-			background-color: $color-gray-50;
-		}
-
-		td {
-			padding: $spacing-md;
-			flex: 1;
-			min-width: 0; // Prevents flex items from overflowing
-
-			&.checkbox-column {
-				width: 40px;
-				text-align: center;
-			}
-
-			&.actions-column {
-				width: 120px;
-				text-align: center;
-				white-space: nowrap;
-			}
-		}
-	}
-
-	&__body {
-
-		.document-table__row:last-child {
-			border-bottom: none;
-		}
-	}
-
-	.document-title {
-
-		@include mix.text-truncate;
-		max-width: 300px;
-		font-weight: $font-weight-bold;
-		color: $color-link;
-
-		&:hover {
-			color: $color-link-hover;
-			text-decoration: underline;
-		}
-	}
-
-	.file-size {
-		white-space: nowrap;
-	}
-
-	.status-indicator {
-		display: inline-block;
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		margin-right: $spacing-xs;
-
-		&--published {
-			background-color: $color-success;
-		}
-
-		&--draft {
-			background-color: $color-warning;
-		}
-
-		&--error {
-			background-color: $color-error;
-		}
-	}
-
+	// Action buttons - Less specific selectors first
 	.action-buttons {
 
 		@include mix.flex(row, center, center, nowrap);
@@ -123,8 +103,8 @@
 
 			svg {
 				display: block;
-				width: 16px;
-				height: 16px;
+				width: 1rem;
+				height: 1rem;
 			}
 		}
 
@@ -164,10 +144,241 @@
 		}
 	}
 
-	.empty-state {
-		padding: $spacing-lg;
-		text-align: center;
-		color: $color-text-light;
+	// Modern Search Bar Styles
+	&__search-header {
+		display: flex !important;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: $spacing-md;
+		padding: $spacing-sm $spacing-md;
+		background-color: $color-gray-100;
+		border-bottom: 3px solid $color-gray-300;
+		gap: $spacing-md;
+		width: 100%;
+		min-height: 3.125rem;
+		box-sizing: border-box;
+		visibility: visible !important;
+		opacity: 1 !important;
+		position: relative;
+		z-index: 1;
+
+		&-left {
+			display: flex !important;
+			align-items: center;
+			gap: $spacing-sm;
+			flex-shrink: 0;
+			visibility: visible !important;
+
+			.doc-repo-button {
+				min-height: 2.25rem;
+				visibility: visible !important;
+			}
+		}
+
+		&-right {
+			flex: 1;
+			display: flex !important;
+			justify-content: flex-end;
+			visibility: visible !important;
+
+			.document-search-wrapper {
+				position: relative;
+				min-width: 15.625rem;
+				max-width: 25rem;
+				width: 100%;
+				display: flex;
+				gap: $spacing-sm;
+				align-items: stretch;
+
+				.document-search-input-wrapper {
+					flex: 1;
+					display: flex;
+					align-items: center;
+					border: 1px solid $color-gray-300;
+					border-radius: $border-radius;
+					background-color: $color-white;
+					transition: border-color $transition-fast;
+					height: 36px;
+					box-sizing: border-box;
+					padding: 0 $spacing-sm 0 $spacing-md;
+
+					&:focus-within {
+						border-color: $color-primary;
+						box-shadow: 0 0 0 1px rgba($color-primary, 0.2);
+					}
+
+					.document-search-input {
+						flex: 1;
+						width: 100%;
+						position: relative;
+
+						.components-base-control__field {
+							width: 100%;
+							visibility: visible !important;
+							position: relative;
+							margin: 0;
+						}
+
+						.components-text-control__input {
+							width: 100%;
+							visibility: visible !important;
+							display: block !important;
+							padding: 0;
+							border: none;
+							background: transparent;
+							height: auto;
+							line-height: 1.5;
+							box-sizing: border-box;
+							box-shadow: none;
+
+							&:focus {
+								border: none;
+								outline: none;
+								box-shadow: none;
+							}
+
+							&::placeholder {
+								color: $color-gray-500;
+							}
+						}
+					}
+
+					.document-search-clear {
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						padding: 0;
+						width: 1.5rem;
+						height: 1.5rem;
+						min-width: 1.5rem;
+						min-height: 1.5rem;
+						background: transparent;
+						border: none;
+						cursor: pointer;
+						color: $color-gray-600;
+						margin: 0;
+						flex-shrink: 0;
+						box-sizing: border-box;
+
+						&:hover {
+							color: $color-gray-900;
+						}
+
+						svg {
+							width: 1rem;
+							height: 1rem;
+							display: block;
+							margin: 0;
+							padding: 0;
+						}
+					}
+				}
+
+				.document-search-button {
+					flex-shrink: 0;
+					height: 36px;
+					min-height: 36px;
+					padding: $spacing-xs $spacing-md;
+					white-space: nowrap;
+					box-sizing: border-box;
+					display: inline-flex;
+					align-items: center;
+				}
+			}
+		}
+	}
+
+	&__header {
+		background-color: $color-gray-100;
+		border-top: 2px solid $color-gray-300;
+		border-bottom: 2px solid $color-gray-200;
+
+		th {
+			padding: $spacing-sm $spacing-md;
+			text-align: left;
+			font-weight: $font-weight-bold;
+			color: $color-gray-700;
+			white-space: nowrap;
+			user-select: none;
+
+			&.checkbox-column {
+				width: 2.5rem;
+				text-align: center;
+			}
+
+			&.actions-column {
+				width: 7.5rem;
+				text-align: center;
+			}
+		}
+	}
+
+	&__row {
+		display: flex;
+		align-items: center;
+		border-bottom: 1px solid $color-gray-200;
+		transition: background-color $transition-fast;
+
+		&:hover {
+			background-color: $color-gray-50;
+		}
+
+		&--selected {
+			background-color: $color-gray-50;
+		}
+
+		td {
+			padding: $spacing-md;
+			flex: 1;
+			min-width: 0; // Prevents flex items from overflowing
+
+			&.checkbox-column {
+				width: 2.5rem;
+				text-align: center;
+			}
+
+			&.actions-column {
+				width: 7.5rem;
+				text-align: center;
+				white-space: nowrap;
+			}
+		}
+
+		// Special handling for excerpt cells to prevent textarea cutoff
+		.document-table-cell {
+			position: relative;
+			overflow: visible;
+
+			&:has(.excerpt-textarea) {
+				overflow: visible;
+				position: relative;
+				z-index: 1;
+			}
+
+			.excerpt-textarea {
+				position: relative;
+				z-index: 10;
+
+				&.components-textarea-control__input {
+					// Ensure textarea can grow beyond cell boundaries
+					position: relative;
+					z-index: 20;
+
+					&:focus {
+						// When focused, allow overflow to show full content
+						overflow: visible;
+						z-index: 30;
+					}
+				}
+			}
+		}
+	}
+
+	&__body {
+
+		.document-table__row:last-child {
+			border-bottom: none;
+		}
 	}
 
 	&__footer {
@@ -179,12 +390,56 @@
 		}
 	}
 
+	.document-title {
+
+		@include mix.text-truncate;
+		max-width: 18.75rem;
+		font-weight: $font-weight-bold;
+		color: $color-link;
+
+		&:hover {
+			color: $color-link-hover;
+			text-decoration: underline;
+		}
+	}
+
+	.file-size {
+		white-space: nowrap;
+	}
+
+	.status-indicator {
+		display: inline-block;
+		width: 0.625rem;
+		height: 0.625rem;
+		border-radius: 50%;
+		margin-right: $spacing-xs;
+
+		&--published {
+			background-color: $color-success;
+		}
+
+		&--draft {
+			background-color: $color-warning;
+		}
+
+		&--error {
+			background-color: $color-error;
+		}
+	}
+
+
+	.empty-state {
+		padding: $spacing-lg;
+		text-align: center;
+		color: $color-text-light;
+	}
+
 	.document-cell {
 
 		&__title {
 
 			@include mix.text-truncate;
-			max-width: 300px;
+			max-width: 18.75rem;
 			display: block;
 		}
 
@@ -231,7 +486,7 @@
 			border-radius: $border-radius-sm;
 			z-index: $z-index-dropdown;
 			box-shadow: $box-shadow-sm;
-			max-width: 200px;
+			max-width: 12.5rem;
 		}
 	}
 
@@ -241,7 +496,7 @@
 
 		th,
 		td {
-			min-width: 100px;
+			min-width: 6.25rem;
 		}
 
 		.delete-button,
@@ -267,7 +522,7 @@ button.components-button.doc-repo-button.spreadsheet-toggle {
 	padding: $spacing-sm $spacing-md;
 	transition: all 0.2s ease;
 	height: auto;
-	min-height: 36px;
+	min-height: 2.25rem;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	margin-right: $spacing-sm;
 
@@ -296,34 +551,36 @@ button.components-button.doc-repo-button.spreadsheet-toggle {
 	}
 }
 
-/* Style all doc-repo-button elements for consistent hover states */
-.doc-repo-button {
 
-	&:hover,
+/* Additional fix for textarea resizing in table context */
+.components-textarea-control__input.excerpt-textarea {
+	// Ensure the textarea can overflow its container
+	position: relative;
+	z-index: 50;
+	max-height: none !important; /* Force remove any max-height */
+	overflow: visible !important; /* Force allow overflow */
+
 	&:focus {
-		opacity: 0.9;
+		// When focused, ensure it's above other elements
+		z-index: 100;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		max-height: none !important;
+		overflow: visible !important;
 	}
 
-	&.edit-button:hover,
-	&.edit-button:focus {
-		background-color: rgba($color-primary, 0.1);
-		color: $color-primary-dark;
-		border-color: $color-primary;
+	// When resizing, ensure it doesn't get cut off
+	&:active {
+		z-index: 100;
+		max-height: none !important;
+		overflow: visible !important;
 	}
 
-	&.delete-button:hover,
-	&.delete-button:focus {
-		background-color: rgba($color-error, 0.9);
-		color: $color-white;
+	// When being dragged/resized
+	&:hover {
+		z-index: 75;
 	}
 }
 
-/* Ensure save button has good contrast on hover */
-.doc-repo-button.save-button {
-
-	&:hover,
-	&:focus {
-		background-color: #069; /* Slightly darker than primary */
-		color: $color-white;
-	}
+.doc-repo-button.bulk-restore-button {
+	margin-right: $spacing-sm;
 }

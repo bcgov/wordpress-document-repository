@@ -76,8 +76,8 @@ const MetadataApp = () => {
 					const currentField = prev.modals[ modalType ].field;
 					let updates = { [ field ]: value };
 
-					// If the field being changed is the label, generate ID
-					if ( field === 'label' ) {
+					// If the field being added is the label, generate ID
+					if ( 'label' === field && 'add' === modalType ) {
 						const baseId = value
 							.toLowerCase()
 							.replace( /[^a-z0-9]+/g, '_' );
@@ -98,22 +98,19 @@ const MetadataApp = () => {
 
 					// Check for changes
 					let hasFieldChanges = false;
+					const fieldsToCompare = [
+						'label',
+						'type',
+						'description',
+						'_rawOptionsText',
+						'multiple',
+					];
 					if ( originalValues ) {
-						// Compare label
-						if ( originalValues.label !== updatedField.label ) {
-							hasFieldChanges = true;
-						}
-						// Compare type
-						else if ( originalValues.type !== updatedField.type ) {
-							hasFieldChanges = true;
-						}
-						// Compare options
-						else if (
-							originalValues._rawOptionsText !==
-							updatedField._rawOptionsText
-						) {
-							hasFieldChanges = true;
-						}
+						hasFieldChanges = fieldsToCompare.some(
+							( key ) =>
+								( originalValues[ key ] || '' ) !==
+								( updatedField[ key ] || '' )
+						);
 					}
 
 					setHasChanges( hasFieldChanges );
@@ -292,10 +289,12 @@ const MetadataApp = () => {
 			const originalFieldValues = {
 				label: field.label || '',
 				type: field.type || '',
+				description: field.description || '',
 				options: normalizeOptions( field.options ),
 				_rawOptionsText:
 					field._rawOptionsText || formatOptionsToString( field ),
 				id: field.id || '',
+				multiple: !! field.multiple,
 			};
 
 			setState( ( prev ) => ( {

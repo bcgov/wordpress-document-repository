@@ -441,6 +441,16 @@ class DocumentMetadataManager {
     }
 
     /**
+     * Get counts of documents by post status.
+     *
+     * @return array Associative array of status => count.
+     */
+    public function get_document_status_counts(): array {
+        $counts = wp_count_posts( $this->config->get_post_type() );
+        return is_object( $counts ) ? (array) $counts : [];
+    }
+
+    /**
      * Save document metadata.
      *
      * @param int   $post_id Document post ID.
@@ -466,12 +476,22 @@ class DocumentMetadataManager {
                     // Handle both single values and arrays.
                     $terms = is_array( $value ) ? $value : [ $value ];
 
-                    // Convert term names to IDs for wp_set_object_terms.
+                    // Convert term names or IDs to term IDs for wp_set_object_terms.
                     $term_ids = [];
-                    foreach ( $terms as $term_name ) {
-                        $term_obj = get_term_by( 'name', $term_name, $taxonomy_name );
-                        if ( $term_obj && ! is_wp_error( $term_obj ) ) {
-                            $term_ids[] = $term_obj->term_id;
+                    foreach ( $terms as $term_value ) {
+                        // Check if the value is numeric (likely an ID).
+                        if ( is_numeric( $term_value ) ) {
+                            // Try to get term by ID first.
+                            $term_obj = get_term( (int) $term_value, $taxonomy_name );
+                            if ( $term_obj && ! is_wp_error( $term_obj ) ) {
+                                $term_ids[] = $term_obj->term_id;
+                            }
+                        } else {
+                            // Try to get term by name.
+                            $term_obj = get_term_by( 'name', $term_value, $taxonomy_name );
+                            if ( $term_obj && ! is_wp_error( $term_obj ) ) {
+                                $term_ids[] = $term_obj->term_id;
+                            }
                         }
                     }
 
@@ -572,6 +592,18 @@ class DocumentMetadataManager {
 
         $args = wp_parse_args( $args, $defaults );
 
+        // Determine post status filter.
+        $status = $args['status'] ?? 'all';
+        switch ( $status ) {
+            case 'trash':
+                $post_status = [ 'trash' ];
+                break;
+            case 'all':
+            default:
+                $post_status = [ 'publish', 'draft', 'pending', 'private' ];
+                break;
+        }
+
         // Build query.
         $query_args = [
             'post_type'      => $this->config->get_post_type(),
@@ -579,7 +611,7 @@ class DocumentMetadataManager {
             'paged'          => $args['paged'],
             'orderby'        => $args['orderby'],
             'order'          => $args['order'],
-            'post_status'    => 'publish',
+            'post_status'    => $post_status,
         ];
 
         // Add search.
@@ -603,12 +635,32 @@ class DocumentMetadataManager {
         // Format results.
         $documents = [];
         foreach ( $query->posts as $post ) {
+            // Get revisions for this post to expose revision link to the UI.
+            $revisions            = wp_get_post_revisions( $post->ID );
+            $revision_count       = is_array( $revisions ) ? count( $revisions ) : 0;
+            $latest_revision_id   = null;
+            $latest_revision_link = '';
+            if ( $revision_count > 0 ) {
+                // wp_get_post_revisions returns an array keyed by revision ID with newest first,
+                // pick the first key as the latest revision.
+                $rev_keys             = array_keys( $revisions );
+                $latest_revision_id   = (int) reset( $rev_keys );
+                $latest_revision_link = admin_url( 'revision.php?revision=' . $latest_revision_id );
+            }
+
             $documents[] = [
-                'id'       => $post->ID,
-                'title'    => $post->post_title,
-                'date'     => $post->post_date,
-                'author'   => get_the_author_meta( 'display_name', $post->post_author ),
-                'metadata' => $this->get_document_metadata( $post->ID ),
+                'id'        => $post->ID,
+                'title'     => $post->post_title,
+                'slug'      => $post->post_name,
+                'date'      => $post->post_date,
+                'author'    => get_the_author_meta( 'display_name', $post->post_author ),
+                'excerpt'   => $post->post_excerpt,
+                'metadata'  => $this->get_document_metadata( $post->ID ),
+                'revisions' => [
+                    'count'       => $revision_count,
+                    'latest'      => $latest_revision_id,
+                    'latest_link' => $latest_revision_link,
+                ],
             ];
         }
 
@@ -735,29 +787,7 @@ class DocumentMetadataManager {
         $total_terms   = 0;
 
         foreach ( $terms as $term_data ) {
-            $term_name = '';
-
-            // Handle both string values and objects.
-            if ( is_array( $term_data ) || is_object( $term_data ) ) {
-                // Convert object to array for consistent handling.
-                $term_array = (array) $term_data;
-
-                // Extract the term name from the object/array.
-                if ( isset( $term_array['name'] ) ) {
-                    $term_name = $term_array['name'];
-                } elseif ( isset( $term_array['label'] ) ) {
-                    $term_name = $term_array['label'];
-                } else {
-                    // If it's just a plain array, skip.
-                    continue;
-                }
-            } elseif ( is_string( $term_data ) ) {
-                $term_name = $term_data;
-            } else {
-                continue;
-            }
-
-            $term_name = trim( (string) $term_name );
+            $term_name = $this->extract_term_name( $term_data );
             if ( empty( $term_name ) ) {
                 continue;
             }
@@ -782,72 +812,139 @@ class DocumentMetadataManager {
     }
 
     /**
+     * Extract term name from various formats (string, object, array).
+     *
+     * @param mixed $term_data Term data in various formats.
+     * @return string|null Extracted term name or null if not found.
+     */
+    private function extract_term_name( $term_data ): ?string {
+        if ( is_string( $term_data ) ) {
+            return trim( $term_data );
+        }
+
+        if ( is_array( $term_data ) || is_object( $term_data ) ) {
+            $term_array = (array) $term_data;
+            if ( isset( $term_array['name'] ) ) {
+                return trim( (string) $term_array['name'] );
+            }
+            if ( isset( $term_array['label'] ) ) {
+                return trim( (string) $term_array['label'] );
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract and normalize term names from options array.
+     *
+     * Handles various formats: strings, objects with 'name' or 'label', arrays.
+     *
+     * @param array $options Array of term options (can be strings, objects, or arrays).
+     * @return array Array of normalized term names (strings).
+     */
+    private function extract_and_normalize_term_names( array $options ): array {
+        $names = array();
+
+        foreach ( $options as $option ) {
+            $term_name = $this->extract_term_name( $option );
+            if ( ! empty( $term_name ) ) {
+                $names[] = $term_name;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
      * Update taxonomy terms for a field.
+     * Synchronize taxonomy terms with field options.
+     * Efficient, safe, and production-ready.
      *
      * @param array $field Metadata field definition.
      * @return bool Whether terms were updated successfully.
      */
     public function update_taxonomy_terms( array $field ): bool {
-        if ( 'taxonomy' !== $field['type'] ) {
-            return false;
-        }
+		if ( ( $field['type'] ?? '' ) !== 'taxonomy' ) {
+			return false;
+		}
 
-        $taxonomy_name = $this->get_taxonomy_name_for_field( $field['id'] );
+		$taxonomy = $this->get_taxonomy_name_for_field( $field['id'] ?? '' );
 
-        // Get existing terms.
-        $existing_terms = get_terms(
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return false;
+		}
+
+		// 1. Normalize desired terms
+		$desired_names = $this->extract_and_normalize_term_names( $field['options'] ?? [] );
+		$desired_names = array_unique( $desired_names );
+		sort( $desired_names );
+
+		// 2. Get current terms (lightweight)
+		$current_terms = get_terms(
             [
-				'taxonomy'   => $taxonomy_name,
-				'hide_empty' => false,
+				'taxonomy'               => $taxonomy,
+				'hide_empty'             => false,
+				'fields'                 => 'id=>name',
+				'update_term_meta_cache' => false,
 			]
         );
 
-        if ( is_wp_error( $existing_terms ) ) {
-            return false;
-        }
+		if ( is_wp_error( $current_terms ) || ! is_array( $current_terms ) ) {
+			return false;
+		}
 
-        $existing_term_names = array_map(
-            function ( $term ) {
-                return $term->name;
-            },
-            $existing_terms
-        );
+		$current_names   = array_values( $current_terms );
+		$term_id_by_name = array_flip( $current_terms );
 
-        // Safely handle options that might contain arrays or non-string values.
-        $new_term_names = [];
-        if ( isset( $field['options'] ) && is_array( $field['options'] ) ) {
-            foreach ( $field['options'] as $option ) {
-                if ( is_string( $option ) ) {
-                    $trimmed = trim( $option );
-                    if ( ! empty( $trimmed ) ) {
-                        $new_term_names[] = $trimmed;
-                    }
-                }
-            }
-        }
+		sort( $current_names );
 
-        // Delete terms that are no longer in the options.
-        $terms_to_delete = array_diff( $existing_term_names, $new_term_names );
-        foreach ( $terms_to_delete as $term_name ) {
-            $term = get_term_by( 'name', $term_name, $taxonomy_name );
-            if ( $term ) {
-                // Remove term relationships from all documents before deleting.
-                $this->remove_term_from_all_documents( $term->term_id, $taxonomy_name );
+		// 3. No changes? Exit early (most common case)
+		if ( $current_names === $desired_names ) {
+			return true;
+		}
 
-                // Delete the term.
-                wp_delete_term( $term->term_id, $taxonomy_name );
-            }
-        }
+		$to_delete = array_diff( $current_names, $desired_names );
+		$to_create = array_diff( $desired_names, $current_names );
 
-        // Add new terms.
-        $terms_to_add = array_diff( $new_term_names, $existing_term_names );
-        if ( ! empty( $terms_to_add ) ) {
-            $this->create_taxonomy_terms( $taxonomy_name, $terms_to_add );
-        }
+		$changed = false;
 
-        return true;
-    }
+		// 4. Delete removed terms
+		foreach ( $to_delete as $name ) {
+			$term_id = $term_id_by_name[ $name ] ?? 0;
+			if ( ! $term_id ) {
+				continue;
+			}
 
+			$this->remove_term_from_all_documents( $term_id, $taxonomy );
+
+			// wp_delete_term returns false|WP_Error on failure, array on success.
+			$deleted = wp_delete_term( $term_id, $taxonomy );
+			if ( $deleted && ! is_wp_error( $deleted ) ) {
+				$changed = true;
+			}
+		}
+
+		// 5. Create new terms
+		foreach ( $to_create as $name ) {
+			// Avoid duplicates if term was created concurrently.
+			if ( term_exists( $name, $taxonomy ) ) {
+				continue;
+			}
+
+			$inserted = wp_insert_term( $name, $taxonomy );
+			if ( ! is_wp_error( $inserted ) ) {
+				$changed = true;
+			}
+		}
+
+		// 6. Clean cache only if something changed
+		if ( $changed ) {
+			clean_taxonomy_cache( $taxonomy );
+		}
+
+		return true;
+	}
     /**
      * Remove a specific term from all documents.
      *

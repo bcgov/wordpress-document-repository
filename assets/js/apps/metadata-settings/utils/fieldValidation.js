@@ -21,6 +21,7 @@ import { __ } from '@wordpress/i18n';
  * @param {string} field.id            - The field's unique identifier
  * @param {string} field.label         - The field's display label
  * @param {string} field.type          - The field's type (text, select, date)
+ * @param {string} field.description   - The field's description
  * @param {Array}  [field.options]     - Options for select fields
  * @param {Array}  [existingFields=[]] - Array of existing fields to check for duplicates
  * @param {number} [currentIndex=null] - Index of the current field in the existing fields array
@@ -34,6 +35,7 @@ import { __ } from '@wordpress/i18n';
  *   id: 'new-field',
  *   label: 'New Field',
  *   type: 'select',
+ *   description: 'This is a brand-new field.',
  *   options: []
  * };
  *
@@ -104,17 +106,19 @@ export const validateField = (
  *                   - id: Empty string for field ID
  *                   - label: Empty string for field label
  *                   - type: Default type 'text'
+ * 					 - description: Empty string for field description
  *                   - options: Empty array for select options
  *                   - _rawOptionsText: Empty string for raw options text
  *
  * @example
  * const newField = getInitialFieldState();
- * // Returns: { id: '', label: '', type: 'text', options: [], _rawOptionsText: '' }
+ * // Returns: { id: '', label: '', type: 'text', description: '', options: [], _rawOptionsText: '' }
  */
 export const getInitialFieldState = () => ( {
 	id: '',
 	label: '',
 	type: 'text',
+	description: '',
 	options: [],
 	_rawOptionsText: '',
 } );
