@@ -15,7 +15,7 @@
 
 import { Modal, Button } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { Icon, warning } from '@wordpress/icons';
+import { Icon, error } from '@wordpress/icons';
 
 const DeleteFieldModal = ( {
 	isOpen,
@@ -39,7 +39,7 @@ const DeleteFieldModal = ( {
 			<div className="document-delete-form">
 				<div className="delete-warning">
 					<div className="warning-icon">
-						<Icon icon={ warning } />
+						<Icon icon={ error } />
 					</div>
 					<div className="warning-content">
 						<strong>
